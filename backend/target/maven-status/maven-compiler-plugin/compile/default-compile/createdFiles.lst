@@ -1,0 +1,10 @@
+com\aibh\repository\ChatMessageRepository.class
+com\aibh\controller\ChatController.class
+com\aibh\service\ChatService.class
+com\aibh\service\AiService.class
+com\aibh\AiBhApplication.class
+com\aibh\service\AiService$2.class
+com\aibh\model\ChatMessage.class
+com\aibh\dto\ChatResponse.class
+com\aibh\service\AiService$1.class
+com\aibh\dto\ChatRequest.class
