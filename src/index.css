@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-beige-50 text-warm-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-sand-600 hover:bg-sand-700 text-white font-medium px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5;
+  }
+  
+  .btn-secondary {
+    @apply bg-beige-200 hover:bg-beige-300 text-warm-800 font-medium px-6 py-3 rounded-xl transition-all duration-200 border border-beige-300;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 bg-white border border-beige-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sand-500 focus:border-transparent transition-all duration-200;
+  }
+  
+  .message-bubble {
+    @apply max-w-xs lg:max-w-md px-4 py-3 rounded-2xl break-words shadow-sm;
+  }
+  
+  .user-message {
+    @apply bg-sand-600 text-white ml-auto rounded-br-md;
+  }
+  
+  .ai-message {
+    @apply bg-white text-warm-800 mr-auto border border-beige-200 rounded-bl-md;
+  }
+  
+  .typing-indicator {
+    @apply flex space-x-1;
+  }
+  
+  .typing-dot {
+    @apply w-2 h-2 bg-sand-400 rounded-full animate-bounce;
+  }
+  
+  .sidebar {
+    @apply bg-gradient-to-b from-beige-100 to-beige-200 border-r border-beige-300;
+  }
+  
+  .chat-container {
+    @apply bg-gradient-to-br from-beige-50 via-white to-beige-100;
+  }
+  
+  .glass-effect {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
+  }
+  
+  .hover-lift {
+    @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
+  }
+}
