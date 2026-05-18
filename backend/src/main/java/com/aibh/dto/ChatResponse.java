@@ -1,13 +1,24 @@
 package com.aibh.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
+@Schema(description = "Chat response payload")
 public class ChatResponse {
     
+    @Schema(description = "AI generated response", example = "I am doing well, thank you!")
     private String response;
+
+    @Schema(description = "Session ID for the conversation", example = "session_123456")
     private String sessionId;
+
+    @Schema(description = "Timestamp of the response")
     private LocalDateTime timestamp;
+
+    @Schema(description = "Indicates if the request was successful", example = "true")
     private boolean success;
+
+    @Schema(description = "Error message if success is false", example = "Service unavailable")
     private String error;
     
     public ChatResponse() {

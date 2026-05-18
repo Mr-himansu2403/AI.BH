@@ -16,7 +16,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/aibh")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class HealthController {
     
     @Autowired
@@ -30,18 +29,25 @@ public class HealthController {
     
     @Autowired
     private JwtConfig jwtConfig;
+
+    @Autowired
+    private com.aibh.health.AiServiceHealthIndicator aiServiceHealthIndicator;
+
+    @Autowired
+    private com.aibh.service.AiService aiService;
     
     @GetMapping("/health")
     public ResponseEntity<HealthResponse> health() {
         HealthResponse response = new HealthResponse("UP");
-        boolean allChecksPass = true;
+        boolean coreChecksPass = true;
+        boolean aiChecksPass = true;
 
         try {
             userRepository.count();
             response.addCheck("database", "UP");
         } catch (Exception e) {
             response.addCheck("database", "DOWN");
-            allChecksPass = false;
+            coreChecksPass = false;
         }
 
         try {
@@ -49,12 +55,41 @@ public class HealthController {
             response.addCheck("jwt", "UP");
         } catch (Exception e) {
             response.addCheck("jwt", "DOWN");
-            allChecksPass = false;
+            coreChecksPass = false;
         }
 
-        if (!allChecksPass) {
+        try {
+            org.springframework.boot.actuate.health.Health health = aiServiceHealthIndicator.health();
+            response.addCheck("ai-service", health.getStatus().getCode());
+            if (!"UP".equals(health.getStatus().getCode())) {
+                aiChecksPass = false;
+            }
+        } catch (Exception e) {
+            response.addCheck("ai-service", "DOWN");
+            aiChecksPass = false;
+        }
+
+        aiService.getProviderStatus().forEach((provider, status) ->
+            response.addCheck("provider-" + provider, status)
+        );
+
+        if (!aiService.hasAtLeastOneAvailableProvider()) {
+            aiChecksPass = false;
+            response.setMessage("No AI provider is currently available. Configure OpenAI, Gemini, or Ollama.");
+        } else if (!coreChecksPass || !aiChecksPass) {
+            response.setMessage("Service is partially degraded. Some dependencies are unavailable.");
+        } else {
+            response.setMessage("Service is ready.");
+        }
+
+        if (!coreChecksPass) {
             response.setStatus("DOWN");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
+
+        if (!aiChecksPass) {
+            response.setStatus("DEGRADED");
+            return ResponseEntity.ok(response);
         }
 
         return ResponseEntity.ok(response);
@@ -77,6 +112,7 @@ public class HealthController {
         
         // Database health
         health.put("database", checkDatabaseHealth());
+        health.put("providers", aiService.getProviderStatus());
         
         // Memory info
         Runtime runtime = Runtime.getRuntime();
@@ -94,9 +130,10 @@ public class HealthController {
     public ResponseEntity<Map<String, Object>> status() {
         Map<String, Object> status = new HashMap<>();
         status.put("service", "AI.BH");
-        status.put("status", "OPERATIONAL");
+        status.put("status", aiService.hasAtLeastOneAvailableProvider() ? "OPERATIONAL" : "DEGRADED");
         status.put("uptime", getUptime());
         status.put("endpoints", getAvailableEndpoints());
+        status.put("providers", aiService.getProviderStatus());
         
         return ResponseEntity.ok(status);
     }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Plus, MessageCircle, Settings, LogOut, User, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,7 +25,7 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg border border-beige-200"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-navy-800 rounded-lg shadow-lg border border-navy-700"
       >
         {isCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
       </button>
@@ -79,7 +80,7 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
                     className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-200 text-left ${
                       currentChatId === chat.id
                         ? 'bg-sand-100 border border-sand-200'
-                        : 'hover:bg-beige-100'
+                        : 'hover:bg-navy-800'
                     }`}
                   >
                     <MessageCircle className="w-4 h-4 text-warm-500 flex-shrink-0" />
@@ -109,7 +110,7 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 onClick={() => setShowProfile(!showProfile)}
-                className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-beige-100 transition-all duration-200"
+                className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-navy-800 transition-all duration-200"
               >
                 <div className="w-8 h-8 bg-gradient-to-br from-warm-400 to-warm-600 rounded-full flex items-center justify-center">
                   <User className="w-4 h-4 text-white" />
@@ -127,9 +128,9 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl border border-beige-200 overflow-hidden"
+                    className="absolute bottom-full left-0 right-0 mb-2 bg-navy-800 rounded-xl shadow-xl border border-navy-700 overflow-hidden"
                   >
-                    <button className="w-full flex items-center space-x-3 p-3 hover:bg-beige-50 transition-colors text-left">
+                    <button className="w-full flex items-center space-x-3 p-3 hover:bg-navy-700 transition-colors text-left">
                       <Settings className="w-4 h-4 text-warm-500" />
                       <span className="text-sm text-warm-700">Settings</span>
                     </button>
@@ -157,6 +158,13 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
       )}
     </>
   );
+};
+
+Sidebar.propTypes = {
+  onNewChat: PropTypes.func.isRequired,
+  chatHistory: PropTypes.array,
+  currentChatId: PropTypes.string,
+  onSelectChat: PropTypes.func.isRequired,
 };
 
 export default Sidebar;

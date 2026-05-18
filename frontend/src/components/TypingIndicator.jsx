@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Bot } from 'lucide-react';
 
@@ -21,7 +20,7 @@ const TypingIndicator = () => {
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white text-warm-800 px-6 py-4 rounded-2xl rounded-bl-md border border-beige-200 shadow-sm"
+        className="bg-navy-800 text-warm-800 px-6 py-4 rounded-2xl rounded-bl-md border border-navy-700 shadow-sm"
       >
         <div className="typing-indicator">
           <motion.div

@@ -1,35 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { authAPI } from '../services/authAPI';
+import { extractErrorMessage } from '../utils/errorUtils';
 
-const AuthContext = createContext();
+// eslint-disable-next-line react-refresh/only-export-components
+export const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
-
-// Helper function to extract error messages
-export const extractErrorMessage = (error) => {
-  // API error response
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
-  
-  // Network error
-  if (error.message === 'Network Error') {
-    return 'Unable to connect to server. Please try again.';
-  }
-  
-  // Timeout error
-  if (error.code === 'ECONNABORTED') {
-    return 'Request timed out. Please try again.';
-  }
-  
-  // Generic error
-  return error.message || 'An unexpected error occurred';
 };
 
 export const AuthProvider = ({ children }) => {
@@ -123,4 +106,8 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 };

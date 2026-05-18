@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <path>password</path>
+                <path>token</path>
+                <path>secret</path>
+            </jsonGeneratorDecorator>
+            <providers>
+                <timestamp>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <version/>
+                <logLevel/>
+                <loggerName/>
+                <threadName/>
+                <context/>
+                <pattern>
+                    <pattern>
+                        {
+                        "application": "ai-bh",
+                        "correlationId": "%X{correlationId:-none}",
+                        "user": "%X{user:-anonymous}"
+                        }
+                    </pattern>
+                </pattern>
+                <message/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+    
+    <logger name="com.aibh" level="DEBUG"/>
+</configuration>

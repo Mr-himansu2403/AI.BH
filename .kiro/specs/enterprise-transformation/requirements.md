@@ -86,4 +86,62 @@ Backend (Enterprise-Ready)
 
 **Acceptance Criteria:**
 - [ ] POST /api/auth/login endpoint accepts email/password
-- [ ] JWT token generat
+- [ ] JWT token generated and returned on successful login
+- [ ] Proper error handling for invalid credentials (401 Unauthorized)
+- [ ] Frontend login form updated to handle token storage
+
+#### Story 1.3: Secure Endpoints
+**As a** system administrator  
+**I want to** protect all API endpoints  
+**So that** only authenticated users can access AI features  
+
+**Acceptance Criteria:**
+- [ ] Spring Security configured to validate JWT tokens on all /api/* requests (except auth)
+- [ ] Role-based access control (RBAC) implemented
+- [ ] Unauthorized requests return 401 without processing
+
+### Epic 2: Production Readiness
+
+#### Story 2.1: Health & Monitoring
+**As a** DevOps engineer  
+**I want to** monitor the application's health  
+**So that** I can ensure system reliability  
+
+**Acceptance Criteria:**
+- [ ] Spring Boot Actuator enabled
+- [ ] /health and /metrics endpoints configured
+- [ ] Prometheus metrics exported
+
+#### Story 2.2: Comprehensive Logging
+**As a** developer  
+**I want to** trace errors easily  
+**So that** I can debug issues in production  
+
+**Acceptance Criteria:**
+- [ ] Structured JSON logging implemented
+- [ ] Request/Response correlation IDs (MDC) added
+- [ ] Sensitive data (passwords, tokens) masked in logs
+
+### Epic 3: Scalability & Performance
+
+#### Story 3.1: Rate Limiting
+**As a** system owner  
+**I want to** prevent abuse of the API  
+**So that** infrastructure costs are predictable  
+
+**Acceptance Criteria:**
+- [ ] Rate limiting implemented using Bucket4j
+- [ ] Global rate limits applied per IP
+- [ ] Specific rate limits applied to AI endpoints
+
+### Epic 4: Developer Experience
+
+#### Story 4.1: API Documentation
+**As a** frontend developer  
+**I want to** view API documentation  
+**So that** I know how to integrate with the backend  
+
+**Acceptance Criteria:**
+- [ ] Swagger UI / OpenAPI 3.0 configured
+- [ ] All endpoints properly documented with request/response schemas
+- [ ] API documentation accessible at /swagger-ui.html

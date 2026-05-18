@@ -22,10 +22,18 @@ public class RateLimitingService {
     private static final int USER_CAPACITY = 100;
     private static final int USER_REFILL = 100;
     private static final Duration USER_PERIOD = Duration.ofMinutes(1);
+
+    private static final int ENTERPRISE_CAPACITY = 500;
+    private static final int ENTERPRISE_REFILL = 500;
+    private static final Duration ENTERPRISE_PERIOD = Duration.ofMinutes(1);
     
     private static final int ADMIN_CAPACITY = 1000;
     private static final int ADMIN_REFILL = 1000;
     private static final Duration ADMIN_PERIOD = Duration.ofMinutes(1);
+
+    private static final int GLOBAL_CAPACITY = 5000;
+    private static final int GLOBAL_REFILL = 5000;
+    private static final Duration GLOBAL_PERIOD = Duration.ofMinutes(1);
     
     public Bucket getBucket(String key, RateLimitType type) {
         return cache.computeIfAbsent(key, k -> createBucket(type));
@@ -43,9 +51,17 @@ public class RateLimitingService {
                 bandwidth = Bandwidth.classic(USER_CAPACITY, 
                     Refill.intervally(USER_REFILL, USER_PERIOD));
                 break;
+            case ENTERPRISE:
+                bandwidth = Bandwidth.classic(ENTERPRISE_CAPACITY, 
+                    Refill.intervally(ENTERPRISE_REFILL, ENTERPRISE_PERIOD));
+                break;
             case ADMIN:
                 bandwidth = Bandwidth.classic(ADMIN_CAPACITY, 
                     Refill.intervally(ADMIN_REFILL, ADMIN_PERIOD));
+                break;
+            case GLOBAL:
+                bandwidth = Bandwidth.classic(GLOBAL_CAPACITY, 
+                    Refill.intervally(GLOBAL_REFILL, GLOBAL_PERIOD));
                 break;
             default:
                 bandwidth = Bandwidth.classic(ANONYMOUS_CAPACITY, 

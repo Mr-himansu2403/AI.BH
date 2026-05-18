@@ -2,6 +2,7 @@ package com.aibh.service;
 
 import com.aibh.dto.ChatRequest;
 import com.aibh.dto.ChatResponse;
+import com.aibh.dto.ConversationSummaryResponse;
 import com.aibh.model.ChatMessage;
 import com.aibh.model.Conversation;
 import com.aibh.model.ConversationStatus;
@@ -16,13 +17,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import reactor.core.publisher.Flux;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class ChatService {
@@ -46,11 +48,20 @@ public class ChatService {
 
     @Transactional
     public Flux<String> streamAndPersist(String message, String sessionId, UserPrincipal userPrincipal) {
+        // Start metrics tracking
+        chatMetrics.incrementChatRequests();
+        var timerSample = chatMetrics.startTimer();
+
         User user = userRepository.findActiveById(userPrincipal.getId())
             .orElseThrow(() -> new RuntimeException("User not found"));
-            
+
+        if (!StringUtils.hasText(sessionId)) {
+            sessionId = generateSessionId();
+        }
+
         Conversation conversation = getOrCreateConversation(sessionId, user, message);
-        List<ChatMessage> history = chatMessageRepository.findRecentBySessionIdWithLimit(sessionId, 10);
+        String resolvedSessionId = conversation.getSessionId();
+        List<ChatMessage> history = chatMessageRepository.findRecentBySessionIdWithLimit(resolvedSessionId, 10);
         
         StringBuilder fullAiResponse = new StringBuilder();
         long startTime = System.currentTimeMillis();
@@ -65,7 +76,20 @@ public class ChatService {
                     chatMessage.setResponseTimeMs(responseTime);
                     chatMessage.setTokensUsed(estimateTokens(message + fullAiResponse.toString()));
                     chatMessageRepository.save(chatMessage);
+                    
+                    // Record metrics
+                    chatMetrics.incrementSuccessfulRequests();
+                    chatMetrics.recordResponseTime(timerSample);
+                    if (chatMessage.getTokensUsed() != null) {
+                        chatMetrics.recordTokensUsed(chatMessage.getTokensUsed());
+                    }
+
                     logger.info("Streamed chat saved for user: {} in {}ms", userPrincipal.getEmail(), responseTime);
+                })
+                .doOnError(error -> {
+                    chatMetrics.incrementErrorRequests();
+                    chatMetrics.recordResponseTime(timerSample);
+                    logger.error("Streaming chat error for user: {}", userPrincipal.getEmail(), error);
                 });
     }
     
@@ -129,12 +153,10 @@ public class ChatService {
             
             chatMessageRepository.save(chatMessage);
             
-            // Update conversation title if it's the first message
-            if (conversation.getMessages().isEmpty()) {
-                String title = generateConversationTitle(request.getMessage());
-                conversation.setTitle(title);
-                conversationRepository.save(conversation);
+            if (!StringUtils.hasText(conversation.getTitle()) || "New Conversation".equals(conversation.getTitle())) {
+                conversation.setTitle(generateConversationTitle(request.getMessage()));
             }
+            conversationRepository.save(conversation);
             
             logger.info("Chat processed successfully for user: {} in {}ms", 
                        userPrincipal.getEmail(), responseTime);
@@ -148,7 +170,7 @@ public class ChatService {
             
             return new ChatResponse(aiResponse, sessionId);
             
-        } catch (Exception e) {
+        } catch (Throwable e) {
             logger.error("ChatService error for user: {}", userPrincipal != null ? userPrincipal.getEmail() : "unknown", e);
             
             // Record error metrics
@@ -159,7 +181,7 @@ public class ChatService {
             try {
                 String fallbackResponse = aiService.generateIntelligentResponse(request.getMessage());
                 return new ChatResponse(fallbackResponse, sessionId);
-            } catch (Exception fallbackError) {
+            } catch (Throwable fallbackError) {
                 logger.error("Fallback also failed for user: {}", userPrincipal != null ? userPrincipal.getEmail() : "unknown", fallbackError);
                 return ChatResponse.error("I apologize, but I'm experiencing technical difficulties. Please try again in a moment.");
             }
@@ -196,6 +218,30 @@ public class ChatService {
     // Backward compatibility method
     public List<ChatMessage> getChatHistory(String sessionId) {
         return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+    }
+
+    public List<ConversationSummaryResponse> getConversations(UserPrincipal userPrincipal) {
+        Objects.requireNonNull(userPrincipal, "User authentication required");
+        Long userId = Objects.requireNonNull(userPrincipal.getId(), "User ID cannot be null");
+        User user = userRepository.findActiveById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return conversationRepository.findActiveByUserId(user.getId()).stream()
+            .map(conversation -> {
+                List<ChatMessage> recentMessages = chatMessageRepository.findRecentBySessionIdWithLimit(conversation.getSessionId(), 1);
+                String lastMessage = recentMessages.isEmpty()
+                    ? ""
+                    : firstNonBlank(recentMessages.get(0).getUserMessage(), recentMessages.get(0).getAiResponse());
+
+                return new ConversationSummaryResponse(
+                    conversation.getSessionId(),
+                    conversation.getTitle(),
+                    lastMessage,
+                    conversation.getCreatedAt(),
+                    conversation.getUpdatedAt()
+                );
+            })
+            .collect(Collectors.toList());
     }
     
     @Transactional
@@ -258,5 +304,13 @@ public class ChatService {
     private int estimateTokens(String text) {
         // Rough estimation: 1 token ≈ 4 characters
         return text != null ? text.length() / 4 : 0;
+    }
+
+    private String firstNonBlank(String primary, String fallback) {
+        if (StringUtils.hasText(primary)) {
+            return primary;
+        }
+
+        return fallback == null ? "" : fallback;
     }
 }

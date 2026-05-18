@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Mic, MicOff, Image, X, Paperclip, FileText, Loader2 } from 'lucide-react';
 import speechService from '../services/speechService';
 import { chatAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
-const ChatInput = ({ onSendMessage, disabled }) => {
+const ChatInput = ({ onSendMessage, disabled, statusMessage }) => {
   const [message, setMessage] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -113,7 +114,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
         await chatAPI.uploadDocument(file);
         toast.success(`Document "${file.name}" indexed for RAG!`);
       } catch (error) {
-        toast.error('Failed to index document.');
+        toast.error(error.message || 'Failed to index document.');
       } finally {
         setIsUploading(false);
         if (docInputRef.current) docInputRef.current.value = '';
@@ -130,7 +131,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
   };
 
   return (
-    <div className="bg-white border-t border-beige-200 p-4">
+    <div className="bg-navy-800 border-t border-navy-700 p-4">
       {/* Image Preview */}
       <AnimatePresence>
         {imagePreview && (
@@ -144,7 +145,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
               <img 
                 src={imagePreview} 
                 alt="Selected" 
-                className="max-w-32 max-h-32 rounded-xl border border-beige-200 shadow-md"
+                className="max-w-32 max-h-32 rounded-xl border border-navy-700 shadow-md"
               />
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -172,7 +173,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
           type="file"
           ref={docInputRef}
           onChange={handleDocSelect}
-          accept=".pdf,.txt,.md,.doc,.docx"
+          accept=".pdf,.txt,.md,.doc,.docx,.json,.csv"
           className="hidden"
         />
         
@@ -184,7 +185,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
             type="button"
             onClick={() => setShowAttachMenu(!showAttachMenu)}
             className={`p-3 rounded-xl transition-all duration-200 ${
-              showAttachMenu ? 'bg-sand-100 text-sand-700' : 'text-warm-500 hover:text-warm-700 hover:bg-beige-100'
+              showAttachMenu ? 'bg-sand-100 text-sand-700' : 'text-warm-500 hover:text-warm-700 hover:bg-navy-800'
             }`}
             title="Attach file"
             disabled={disabled || isUploading}
@@ -202,12 +203,12 @@ const ChatInput = ({ onSendMessage, disabled }) => {
                 initial={{ opacity: 0, scale: 0.9, y: -10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                className="absolute bottom-full mb-2 left-0 bg-white rounded-xl shadow-2xl border border-beige-200 p-2 min-w-[160px] z-50"
+                className="absolute bottom-full mb-2 left-0 bg-navy-800 rounded-xl shadow-2xl border border-navy-700 p-2 min-w-[160px] z-50"
               >
                 <button
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
-                  className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-beige-50 rounded-lg transition-colors text-warm-700"
+                  className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-navy-700 rounded-lg transition-colors text-warm-700"
                 >
                   <Image className="w-4 h-4 text-blue-500" />
                   <span className="text-sm font-medium">Image</span>
@@ -215,7 +216,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
                 <button
                   type="button"
                   onClick={() => docInputRef.current?.click()}
-                  className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-beige-50 rounded-lg transition-colors text-warm-700"
+                  className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-navy-700 rounded-lg transition-colors text-warm-700"
                 >
                   <FileText className="w-4 h-4 text-green-500" />
                   <span className="text-sm font-medium">Document</span>
@@ -233,7 +234,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
             onChange={handleTextareaChange}
             onKeyPress={handleKeyPress}
             placeholder="Type your message... (Press Enter to send)"
-            className="w-full px-4 py-3 pr-12 bg-beige-50 border border-beige-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sand-500 focus:border-transparent transition-all duration-200 resize-none min-h-[48px] max-h-[120px]"
+            className="w-full px-4 py-3 pr-12 bg-navy-700 border border-beige-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sand-500 focus:border-transparent transition-all duration-200 resize-none min-h-[48px] max-h-[120px]"
             disabled={disabled || isUploading}
             rows={1}
           />
@@ -248,7 +249,7 @@ const ChatInput = ({ onSendMessage, disabled }) => {
               className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-lg transition-all duration-200 ${
                 isListening 
                   ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' 
-                  : 'text-warm-500 hover:text-warm-700 hover:bg-beige-100'
+                  : 'text-warm-500 hover:text-warm-700 hover:bg-navy-800'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input'}
               disabled={disabled || isUploading}
@@ -270,6 +271,12 @@ const ChatInput = ({ onSendMessage, disabled }) => {
         </motion.button>
       </form>
 
+      {statusMessage && (
+        <p className="mt-3 text-xs text-warm-500">
+          {statusMessage}
+        </p>
+      )}
+
       {/* Voice Listening Indicator */}
       <AnimatePresence>
         {isListening && (
@@ -290,6 +297,12 @@ const ChatInput = ({ onSendMessage, disabled }) => {
       </AnimatePresence>
     </div>
   );
+};
+
+ChatInput.propTypes = {
+  onSendMessage: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+  statusMessage: PropTypes.string,
 };
 
 export default ChatInput;

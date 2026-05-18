@@ -26,6 +26,7 @@ public class DatabaseInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         try {
             initializeDemoUser();
+            initializeAdminUser();
         } catch (Exception e) {
             logger.error("Database initialization failed, but application will continue", e);
         }
@@ -55,6 +56,31 @@ public class DatabaseInitializer implements ApplicationRunner {
             
         } catch (Exception e) {
             logger.error("Failed to create demo user", e);
+        }
+    }
+
+    private void initializeAdminUser() {
+        String adminEmail = "himansu@gmail.com";
+        
+        try {
+            if (userRepository.existsByEmail(adminEmail)) {
+                logger.info("Admin user already exists, skipping initialization");
+                return;
+            }
+            
+            User adminUser = new User();
+            adminUser.setEmail(adminEmail);
+            adminUser.setPassword(passwordEncoder.encode("2421"));
+            adminUser.setFirstName("Himansu");
+            adminUser.setLastName("Admin");
+            adminUser.setRole(Role.ADMIN);
+            adminUser.setEnabled(true);
+            
+            userRepository.save(adminUser);
+            logger.info("Admin user created successfully: {}", adminEmail);
+            
+        } catch (Exception e) {
+            logger.error("Failed to create admin user", e);
         }
     }
 }

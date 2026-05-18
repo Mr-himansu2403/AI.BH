@@ -7,27 +7,73 @@ import org.springframework.stereotype.Service;
 public class ModelRoutingService {
     
     public String selectModel(Intent intent, boolean isVisionRequest) {
+        return selectModel(intent, isVisionRequest, "openai");
+    }
+
+    public String selectModel(Intent intent, boolean isVisionRequest, String provider) {
+        String normalizedProvider = provider == null ? "openai" : provider.toLowerCase();
+
         if (isVisionRequest) {
-            return "gpt-4-vision-preview";
+            return switch (normalizedProvider) {
+                case "gemini" -> "gemini-2.0-flash";
+                case "ollama" -> "llava";
+                default -> "gpt-4o";
+            };
         }
         
         if (intent == null) {
-            return "gpt-4o-mini";
+            return defaultModelForProvider(normalizedProvider);
         }
         
-        switch (intent.getType()) {
-            case "technical":
-            case "academic":
-                return "gpt-4o"; // More capable model for complex tasks
-            case "creative":
-                return "gpt-4o"; // Better for creative tasks
-            case "problem_solving":
-                return "gpt-4o"; // Better reasoning capabilities
-            case "greeting":
-            case "general":
-            default:
-                return "gpt-4o-mini"; // Faster and cheaper for simple tasks
-        }
+        return switch (normalizedProvider) {
+            case "anthropic" -> selectAnthropicModel(intent);
+            case "gemini" -> selectGeminiModel(intent);
+            case "ollama" -> selectOllamaModel(intent);
+            default -> selectOpenAiModel(intent);
+        };
+    }
+
+    private String selectOpenAiModel(Intent intent) {
+        return switch (intent.getType()) {
+            case "technical", "academic", "creative", "problem_solving" -> "gpt-4o";
+            case "greeting", "general" -> "gpt-4o-mini";
+            default -> "gpt-4o-mini";
+        };
+    }
+
+    private String selectGeminiModel(Intent intent) {
+        return switch (intent.getType()) {
+            case "technical", "academic", "problem_solving" -> "gemini-2.5-pro";
+            case "creative" -> "gemini-2.0-flash";
+            case "greeting", "general" -> "gemini-2.0-flash";
+            default -> "gemini-2.0-flash";
+        };
+    }
+
+    private String selectAnthropicModel(Intent intent) {
+        return switch (intent.getType()) {
+            case "technical", "academic", "problem_solving" -> "claude-3-opus-20240229";
+            case "creative", "greeting", "general" -> "claude-3-sonnet-20240229";
+            default -> "claude-3-sonnet-20240229";
+        };
+    }
+
+    private String selectOllamaModel(Intent intent) {
+        return switch (intent.getType()) {
+            case "technical", "academic", "problem_solving" -> "llama3";
+            case "creative" -> "llama3";
+            case "greeting", "general" -> "llama3";
+            default -> "llama3";
+        };
+    }
+
+    private String defaultModelForProvider(String provider) {
+        return switch (provider) {
+            case "anthropic" -> "claude-3-sonnet-20240229";
+            case "gemini" -> "gemini-2.0-flash";
+            case "ollama" -> "llama3";
+            default -> "gpt-4o-mini";
+        };
     }
     
     public int getMaxTokens(Intent intent) {

@@ -7,6 +7,7 @@ import com.aibh.dto.RefreshTokenRequest;
 import com.aibh.model.User;
 import com.aibh.repository.UserRepository;
 import com.aibh.security.JwtTokenProvider;
+import com.aibh.security.TokenBlacklistService;
 import com.aibh.security.UserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,9 @@ public class AuthService {
     
     @Autowired
     private JwtTokenProvider tokenProvider;
+
+    @Autowired
+    private TokenBlacklistService blacklistService;
     
     public AuthResponse login(AuthRequest request) {
         try {
@@ -133,14 +137,11 @@ public class AuthService {
         }
     }
     
-    public void logout(UserPrincipal user) {
-        // In a more sophisticated implementation, you would:
-        // 1. Add the token to a blacklist
-        // 2. Store blacklisted tokens in Redis with expiration
-        // 3. Check blacklist in JWT filter
+    public void logout(UserPrincipal user, String token) {
+        // Blacklist the token
+        blacklistService.blacklistToken(token);
         
-        // For now, we just log the logout
-        logger.info("User logged out: {}", user.getEmail());
+        logger.info("User logged out and token blacklisted: {}", user.getEmail());
         
         // Client-side token removal is handled by the frontend
     }

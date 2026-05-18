@@ -26,9 +26,9 @@ const NewLandingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-beige-100 via-beige-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950">
       {/* Navbar */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
+      <nav className="bg-navy-800/80 backdrop-blur-md border-b border-navy-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -80,7 +80,7 @@ const NewLandingPage = () => {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="md:hidden bg-white border-t border-gray-200 px-4 py-4 space-y-4"
+            className="md:hidden bg-navy-800 border-t border-navy-700 px-4 py-4 space-y-4"
           >
             <a href="#features" className="block text-text-light hover:text-primary-600">Features</a>
             <a href="#about" className="block text-text-light hover:text-primary-600">About</a>
@@ -152,7 +152,7 @@ const NewLandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 bg-white">
+      <section id="features" className="py-24 bg-navy-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -186,7 +186,7 @@ const NewLandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-text text-white py-12">
+      <footer className="bg-navy-950 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
@@ -196,12 +196,12 @@ const NewLandingPage = () => {
                 </div>
                 <span className="text-xl font-bold">AI.BH</span>
               </div>
-              <p className="text-gray-400">Smart AI Platform for Automation</p>
+              <p className="text-text-lighter">Smart AI Platform for Automation</p>
             </div>
             
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
+              <ul className="space-y-2 text-text-lighter">
                 <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API</a></li>
@@ -210,7 +210,7 @@ const NewLandingPage = () => {
             
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
+              <ul className="space-y-2 text-text-lighter">
                 <li><a href="#" className="hover:text-white transition-colors">About</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
@@ -219,7 +219,7 @@ const NewLandingPage = () => {
             
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
+              <ul className="space-y-2 text-text-lighter">
                 <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
@@ -227,7 +227,7 @@ const NewLandingPage = () => {
             </div>
           </div>
           
-          <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+          <div className="border-t border-navy-600 mt-8 pt-8 text-center text-text-lighter">
             <p>&copy; 2024 AI.BH. All rights reserved.</p>
           </div>
         </div>

@@ -36,6 +36,7 @@ public class JwtTokenProvider {
                 .claim("role", userPrincipal.getRole())
                 .claim("fullName", userPrincipal.getFullName())
                 .setIssuedAt(new Date())
+                .setNotBefore(new Date())
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -48,6 +49,7 @@ public class JwtTokenProvider {
                 .setSubject(userPrincipal.getId().toString())
                 .claim("type", "refresh")
                 .setIssuedAt(new Date())
+                .setNotBefore(new Date())
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -76,6 +78,8 @@ public class JwtTokenProvider {
             logger.error("Invalid JWT token");
         } catch (ExpiredJwtException ex) {
             logger.error("Expired JWT token");
+        } catch (PrematureJwtException ex) {
+            logger.error("JWT token is not yet valid");
         } catch (UnsupportedJwtException ex) {
             logger.error("Unsupported JWT token");
         } catch (IllegalArgumentException ex) {

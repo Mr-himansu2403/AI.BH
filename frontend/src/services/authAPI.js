@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance with default config
 const authAxios = axios.create({
@@ -128,29 +128,25 @@ const authAPI = {
   },
 
   getCurrentUser: async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No token available');
-      }
-
-      const response = await authAxios.get('/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const user = response.data;
-      return {
-        id: user.id,
-        name: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        role: user.role,
-        avatar: null
-      };
-    } catch (error) {
-      throw error;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token available');
     }
+
+    const response = await authAxios.get('/auth/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const user = response.data;
+    return {
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: user.role,
+      avatar: null
+    };
   }
 };
 

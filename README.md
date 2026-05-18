@@ -4,11 +4,13 @@ AI.BH is a full-stack AI assistant built using Spring Boot and React, featuring 
 
 ## Features
 
-- 💬 Natural language conversation
+- 💬 Natural language conversation (OpenAI, Gemini, Anthropic)
 - 🎤 Voice input and output
 - 👁️ Image understanding
-- 🧠 Conversation memory
-- 🔒 Secure architecture
+- 🧠 Conversation memory & RAG (Document Ingestion)
+- 🔒 Secure RBAC & JWT Authentication
+- 📈 Advanced Monitoring & Enterprise Logging
+- ⚡ Rate Limiting & Scalability Ready
 
 ## Tech Stack
 

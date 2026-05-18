@@ -28,6 +28,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
+
+    @Autowired
+    private TokenBlacklistService blacklistService;
     
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, 
@@ -37,6 +40,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
             
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                // Check if token is blacklisted
+                if (blacklistService.isBlacklisted(jwt)) {
+                    logger.warn("Attempted access with blacklisted token");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 Long userId = tokenProvider.getUserIdFromToken(jwt);
                 
                 UserDetails userDetails = customUserDetailsService.loadUserById(userId);

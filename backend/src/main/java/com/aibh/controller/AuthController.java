@@ -27,7 +27,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 @Tag(name = "Authentication", description = "User authentication and authorization operations")
 public class AuthController {
     
@@ -243,9 +242,11 @@ public class AuthController {
         @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal user) {
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal user,
+                                     @RequestHeader("Authorization") String bearerToken) {
         logger.info("Logout for user: {}", user.getEmail());
-        authService.logout(user);
+        String token = bearerToken.substring(7);
+        authService.logout(user, token);
         logger.info("Logout successful for user: {}", user.getEmail());
         return ResponseEntity.ok().build();
     }

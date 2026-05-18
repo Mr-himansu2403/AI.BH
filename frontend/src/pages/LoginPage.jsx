@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Bot, Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -85,7 +85,7 @@ const LoginPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-white rounded-2xl shadow-xl p-8 border border-beige-200"
+          className="bg-navy-800 rounded-2xl shadow-xl p-8 border border-navy-700"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Field */}
@@ -158,18 +158,18 @@ const LoginPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className="mt-6 p-4 bg-beige-50 rounded-xl border border-beige-200"
+            className="mt-6 p-4 bg-navy-700 rounded-xl border border-navy-700"
           >
             <p className="text-sm text-warm-600 mb-2 font-medium">Demo Credentials:</p>
             <p className="text-xs text-warm-500">Email: demo@aibh.com</p>
             <p className="text-xs text-warm-500">Password: demo1234</p>
-            <p className="text-xs text-warm-400 mt-2 italic">Note: Sign up first if demo user doesn't exist</p>
+            <p className="text-xs text-warm-400 mt-2 italic">Note: Sign up first if demo user doesn&apos;t exist</p>
           </motion.div>
 
           {/* Sign Up Link */}
           <div className="mt-6 text-center">
             <p className="text-warm-600">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link to="/signup" className="text-sand-600 hover:text-sand-700 font-medium transition-colors">
                 Sign up here
               </Link>

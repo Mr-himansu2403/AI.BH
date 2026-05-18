@@ -25,11 +25,13 @@ CREATE TABLE conversation_embeddings (
     embedding_vector FLOAT8[] NOT NULL, -- 1536 dimensions for OpenAI embeddings
     message_type VARCHAR(20) DEFAULT 'USER', -- USER, ASSISTANT
     topic_tags TEXT[], -- Extracted topics: ['java', 'spring-boot', 'api']
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user_embeddings (user_id),
-    INDEX idx_conversation_embeddings (conversation_id),
-    INDEX idx_topic_tags USING GIN (topic_tags)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Indexes for conversation_embeddings
+CREATE INDEX idx_user_embeddings ON conversation_embeddings (user_id);
+CREATE INDEX idx_conversation_embeddings ON conversation_embeddings (conversation_id);
+CREATE INDEX idx_topic_tags ON conversation_embeddings USING GIN (topic_tags);
 
 -- Memory Context Sessions
 CREATE TABLE memory_contexts (
@@ -57,5 +59,6 @@ CREATE TABLE data_retention_policies (
 -- Indexes for Performance
 CREATE INDEX idx_user_memory_type ON user_memory_profiles(user_id, memory_type);
 CREATE INDEX idx_memory_expiry ON user_memory_profiles(expires_at) WHERE expires_at IS NOT NULL;
-CREATE INDEX idx_embedding_similarity ON conversation_embeddings USING ivfflat (embedding_vector vector_cosine_ops);
+-- Note: ivfflat is PostgreSQL specific, may need pgvector extension
+-- CREATE INDEX idx_embedding_similarity ON conversation_embeddings USING ivfflat (embedding_vector vector_cosine_ops);
 CREATE INDEX idx_context_session ON memory_contexts(user_id, session_id);

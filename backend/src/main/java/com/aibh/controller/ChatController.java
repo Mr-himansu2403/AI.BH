@@ -2,6 +2,7 @@ package com.aibh.controller;
 
 import com.aibh.dto.ChatRequest;
 import com.aibh.dto.ChatResponse;
+import com.aibh.dto.ConversationSummaryResponse;
 import com.aibh.model.ChatMessage;
 import com.aibh.security.UserPrincipal;
 import com.aibh.service.ChatService;
@@ -27,7 +28,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/aibh")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 @Tag(name = "Chat", description = "AI Chat Operations")
 @SecurityRequirement(name = "bearerAuth")
 public class ChatController {
@@ -50,41 +50,56 @@ public class ChatController {
         @ApiResponse(responseCode = "429", description = "Rate limit exceeded"),
         @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public ResponseEntity<ChatResponse> chat(
             @Valid @RequestBody ChatRequest request,
             @AuthenticationPrincipal UserPrincipal user) {
         
         logger.info("Processing chat request for user: {}", user.getEmail());
-        ChatResponse response = chatService.processChat(request, user);
-        return ResponseEntity.ok(response);
+        try {
+            ChatResponse response = chatService.processChat(request, user);
+            return ResponseEntity.ok(response);
+        } catch (Throwable t) {
+            logger.error("Chat endpoint failed for user: {}", user.getEmail(), t);
+            return ResponseEntity.ok(new ChatResponse(
+                    aiService.generateIntelligentResponse(request.getMessage()),
+                    request.getSessionId()
+            ));
+        }
     }
 
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Stream chat message", description = "Stream a text message from the AI assistant using SSE")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public Flux<ServerSentEvent<String>> streamChat(
             @RequestParam String message,
             @RequestParam(required = false) String sessionId,
             @AuthenticationPrincipal UserPrincipal user) {
         
         logger.info("Streaming chat request for user: {}", user.getEmail());
-        
-        return chatService.streamAndPersist(message, sessionId, user)
-                .map(content -> ServerSentEvent.<String>builder()
-                        .data(content)
-                        .build())
-                .onErrorResume(e -> {
-                    logger.error("Streaming error", e);
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .data("[ERROR]")
-                            .build());
-                });
+
+        try {
+            return chatService.streamAndPersist(message, sessionId, user)
+                    .map(content -> ServerSentEvent.<String>builder()
+                            .data(content)
+                            .build())
+                    .onErrorResume(e -> {
+                        logger.error("Streaming error", e);
+                        return Flux.just(ServerSentEvent.<String>builder()
+                                .data(aiService.generateIntelligentResponse(message))
+                                .build());
+                    });
+        } catch (Throwable t) {
+            logger.error("Streaming endpoint failed for user: {}", user.getEmail(), t);
+            return Flux.just(ServerSentEvent.<String>builder()
+                    .data(aiService.generateIntelligentResponse(message))
+                    .build());
+        }
     }
     
     @PostMapping("/chat/image")
     @Operation(summary = "Send image with message", description = "Send an image with text message to the AI assistant")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public ResponseEntity<ChatResponse> chatWithImage(
             @Valid @RequestBody ChatRequest request,
             @AuthenticationPrincipal UserPrincipal user) {
@@ -97,7 +112,7 @@ public class ChatController {
     
     @GetMapping("/chat/history")
     @Operation(summary = "Get chat history", description = "Retrieve chat history for a session")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public ResponseEntity<List<ChatMessage>> getChatHistory(
             @RequestParam String sessionId,
             @AuthenticationPrincipal UserPrincipal user) {
@@ -106,10 +121,20 @@ public class ChatController {
         List<ChatMessage> history = chatService.getChatHistory(sessionId, user);
         return ResponseEntity.ok(history);
     }
+
+    @GetMapping("/chat/conversations")
+    @Operation(summary = "Get conversations", description = "Retrieve recent conversations for the authenticated user")
+    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
+    public ResponseEntity<List<ConversationSummaryResponse>> getConversations(
+            @AuthenticationPrincipal UserPrincipal user) {
+
+        logger.info("Retrieving conversations for user: {}", user.getEmail());
+        return ResponseEntity.ok(chatService.getConversations(user));
+    }
     
     @DeleteMapping("/chat/history")
     @Operation(summary = "Clear chat history", description = "Clear chat history for a session")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public ResponseEntity<Void> clearChatHistory(
             @RequestParam String sessionId,
             @AuthenticationPrincipal UserPrincipal user) {

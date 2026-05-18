@@ -37,12 +37,33 @@ npm run dev
 Create `backend/src/main/resources/application-local.properties`:
 ```properties
 openai.api.key=your-openai-api-key-here
+app.ai.gemini.api-key=your-gemini-api-key-here
 ```
+
+To enable multiple providers together, configure:
+```properties
+AI_PROVIDER=openai
+AI_PROVIDERS=openai,gemini,ollama
+OPENAI_API_KEY=your-openai-key
+GEMINI_API_KEY=your-gemini-key
+```
+
+`AI_PROVIDER` is the first choice. `AI_PROVIDERS` is the fallback order if the first provider fails.
 
 ### Frontend Environment Variables
 Create `frontend/.env.local`:
 ```
 VITE_API_BASE_URL=http://localhost:8080/api
+```
+
+For production, point `VITE_API_BASE_URL` to your deployed backend, for example:
+```
+VITE_API_BASE_URL=https://your-backend-domain/api
+```
+
+Allow your deployed frontend origin in the backend with:
+```properties
+CORS_ALLOWED_ORIGIN_PATTERNS=https://your-frontend-domain,https://www.your-frontend-domain
 ```
 
 ## Production Deployment
@@ -88,20 +109,20 @@ npm run build
 ## Features
 
 ✅ **Implemented:**
-- Text-based chat with AI
+- Text-based chat with multiple AI providers (OpenAI, Gemini, Anthropic)
 - Voice input/output (Web Speech API)
 - Image upload and analysis
-- Conversation memory
-- Session management
-- Responsive UI
-- Real-time typing indicators
+- Conversation memory & RAG
+- JWT Authentication & User Accounts (RBAC)
+- Document upload and vector indexing
+- Enterprise Logging & Sensitive Data Masking
+- API Rate Limiting (IP & User based)
+- Advanced Health Monitoring (Actuator)
 
 🚧 **Future Enhancements:**
-- JWT Authentication
-- User accounts
 - Chat export
-- Multiple AI models
-- File upload support
+- Interactive Figma-to-Code integration
+- Advanced fine-tuning support
 
 ## Troubleshooting
 

@@ -8,10 +8,12 @@ public class HealthResponse {
     private String status;
     private LocalDateTime timestamp;
     private Map<String, String> checks;
+    private String message;
 
     public HealthResponse() {
         this.timestamp = LocalDateTime.now();
         this.checks = new HashMap<>();
+        this.message = "";
     }
 
     public HealthResponse(String status) {
@@ -29,4 +31,6 @@ public class HealthResponse {
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
     public Map<String, String> getChecks() { return checks; }
     public void setChecks(Map<String, String> checks) { this.checks = checks; }
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
 }

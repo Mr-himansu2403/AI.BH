@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Sparkles } from 'lucide-react';
+import { Bot, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
 import TypingIndicator from '../components/TypingIndicator';
+import ArtifactPanel from '../components/ArtifactPanel';
 import { chatAPI } from '../services/api';
 import speechService from '../services/speechService';
 import toast from 'react-hot-toast';
@@ -12,20 +13,72 @@ import toast from 'react-hot-toast';
 const ChatPage = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeArtifact, setActiveArtifact] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
+  const [serviceHealth, setServiceHealth] = useState(null);
+  const [healthMessage, setHealthMessage] = useState('Checking AI service status...');
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    initializeChat();
+  const mapConversationSummaries = useCallback((conversations) => (
+    conversations.map((chat) => ({
+      id: chat.sessionId,
+      title: chat.title,
+      lastMessage: chat.lastMessage,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt
+    }))
+  ), []);
+
+  const generateSessionId = useCallback(() => {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const hydrateMessages = useCallback((history) => {
+    const hydrated = [];
 
-  const initializeChat = () => {
+    history.forEach((entry) => {
+      if (entry.userMessage) {
+        hydrated.push({
+          id: `${entry.id}-user`,
+          message: entry.userMessage,
+          isUser: true,
+          timestamp: entry.createdAt,
+          imageUrl: entry.imageUrl || null
+        });
+      }
+
+      if (entry.aiResponse) {
+        hydrated.push({
+          id: `${entry.id}-ai`,
+          message: entry.aiResponse,
+          isUser: false,
+          timestamp: entry.createdAt
+        });
+      }
+    });
+
+    return hydrated;
+  }, []);
+
+  const loadConversation = useCallback(async (chatId) => {
+    setIsLoadingHistory(true);
+    try {
+      const history = await chatAPI.getChatHistory(chatId);
+      setCurrentChatId(chatId);
+      setSessionId(chatId);
+      setMessages(hydrateMessages(history));
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      toast.error('Failed to load conversation history.');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [hydrateMessages]);
+
+  const initializeChat = useCallback(() => {
     const newSessionId = generateSessionId();
     setSessionId(newSessionId);
     setCurrentChatId(newSessionId);
@@ -46,89 +99,65 @@ const ChatPage = () => {
         speechService.speak(welcomeMessage.message);
       }
     }, 1000);
-  };
+  }, [generateSessionId]);
 
-  const generateSessionId = () => {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const bootstrapChat = useCallback(async () => {
+    try {
+      const conversations = await chatAPI.getConversations();
+      const mappedConversations = mapConversationSummaries(conversations);
+      setChatHistory(mappedConversations);
+
+      if (mappedConversations.length > 0) {
+        await loadConversation(mappedConversations[0].id);
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to bootstrap conversations:', error);
+    }
+
+    initializeChat();
+  }, [loadConversation, mapConversationSummaries, initializeChat]);
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const health = await chatAPI.healthCheck();
+      setServiceHealth(health);
+      setHealthMessage(health.message || 'Service status updated.');
+    } catch (error) {
+      setServiceHealth({
+        status: 'DOWN',
+        checks: {},
+        message: 'Backend is unreachable. Check API deployment and network access.'
+      });
+      setHealthMessage('Backend is unreachable. Check API deployment and network access.');
+    }
+  }, []);
+
+  useEffect(() => {
+    bootstrapChat();
+    checkHealth();
+    const intervalId = setInterval(checkHealth, 30000);
+    return () => clearInterval(intervalId);
+  }, [bootstrapChat, checkHealth]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const refreshConversations = async () => {
+    try {
+      const conversations = await chatAPI.getConversations();
+      setChatHistory(mapConversationSummaries(conversations));
+    } catch (error) {
+      console.error('Failed to refresh conversations:', error);
+    }
   };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = async (messageText, imageData = null) => {
-    if (!messageText && !imageData) return;
-
-    const userMessage = {
-      id: Date.now(),
-      message: messageText,
-      isUser: true,
-      timestamp: new Date().toISOString(),
-      imageUrl: imageData
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-
-    try {
-      if (imageData) {
-        const response = await chatAPI.sendImageMessage(messageText, imageData, sessionId);
-        const aiMessage = {
-          id: Date.now() + 1,
-          message: response.response,
-          isUser: false,
-          timestamp: response.timestamp
-        };
-        setMessages(prev => [...prev, aiMessage]);
-        updateChatHistory(sessionId, messageText, response.response);
-        if (speechService.isSupported()) {
-          setTimeout(() => speechService.speak(response.response), 500);
-        }
-      } else {
-        // Streaming for text messages
-        const aiMessageId = Date.now() + 1;
-        const initialAiMessage = {
-          id: aiMessageId,
-          message: '',
-          isUser: false,
-          timestamp: new Date().toISOString()
-        };
-        
-        setMessages(prev => [...prev, initialAiMessage]);
-        
-        let fullResponse = '';
-        await chatAPI.streamMessage(messageText, sessionId, (chunk) => {
-          fullResponse += chunk;
-          setMessages(prev => prev.map(msg => 
-            msg.id === aiMessageId ? { ...msg, message: fullResponse } : msg
-          ));
-        });
-
-        updateChatHistory(sessionId, messageText, fullResponse);
-        
-        if (speechService.isSupported()) {
-          setTimeout(() => speechService.speak(fullResponse), 500);
-        }
-      }
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
-      
-      const errorMessage = {
-        id: Date.now() + 2,
-        message: "I apologize, but I'm experiencing technical difficulties. Please try again in a moment.",
-        isUser: false,
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateChatHistory = (chatId, userMsg, aiMsg) => {
+  const updateChatHistory = useCallback((chatId, userMsg) => {
     setChatHistory(prev => {
       const existingChat = prev.find(chat => chat.id === chatId);
       if (existingChat) {
@@ -147,6 +176,98 @@ const ChatPage = () => {
         }];
       }
     });
+  }, []);
+
+  const handleSendMessage = async (messageText, imageData = null) => {
+    if (!messageText && !imageData) return;
+
+    const userMessage = {
+      id: Date.now(),
+      message: messageText,
+      isUser: true,
+      timestamp: new Date().toISOString(),
+      imageUrl: imageData
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      if (serviceHealth?.status === 'DOWN') {
+        toast.error(serviceHealth?.message || 'Backend is unavailable right now.');
+      } else if (serviceHealth?.status === 'DEGRADED') {
+        toast(serviceHealth?.message || 'AI provider is degraded. Attempting fallback response.');
+      }
+
+      if (imageData) {
+        const response = await chatAPI.sendImageMessage(messageText, imageData, sessionId);
+        const aiMessage = {
+          id: Date.now() + 1,
+          message: response.response,
+          isUser: false,
+          timestamp: response.timestamp
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        updateChatHistory(sessionId, messageText);
+        await refreshConversations();
+        if (speechService.isSupported()) {
+          setTimeout(() => speechService.speak(response.response), 500);
+        }
+      } else {
+        // Streaming for text messages
+        const aiMessageId = Date.now() + 1;
+        const initialAiMessage = {
+          id: aiMessageId,
+          message: '',
+          isUser: false,
+          timestamp: new Date().toISOString()
+        };
+        
+        setMessages(prev => [...prev, initialAiMessage]);
+        
+        let fullResponse = '';
+        try {
+          await chatAPI.streamMessage(messageText, sessionId, (chunk) => {
+            fullResponse += chunk;
+            setMessages(prev => prev.map(msg => 
+              msg.id === aiMessageId ? { ...msg, message: fullResponse } : msg
+            ));
+          });
+        } catch (streamError) {
+          console.error('Streaming failed, falling back to standard response:', streamError);
+          const response = await chatAPI.sendMessage(messageText, sessionId);
+          fullResponse = response.response || response.error || 'The assistant could not generate a response.';
+          setMessages(prev => prev.map(msg =>
+            msg.id === aiMessageId ? { ...msg, message: fullResponse } : msg
+          ));
+          if (streamError?.message) {
+            toast.error(`Streaming failed: ${streamError.message}`);
+          }
+        }
+
+        updateChatHistory(sessionId, messageText);
+        await refreshConversations();
+        
+        if (speechService.isSupported()) {
+          setTimeout(() => speechService.speak(fullResponse), 500);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error(error.message || 'Failed to send message. Please try again.');
+      
+      const errorMessage = {
+        id: Date.now() + 2,
+        message: error.message || 'The assistant is unavailable right now. Check AI provider configuration and try again.',
+        isUser: false,
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleNewChat = () => {
@@ -162,19 +283,11 @@ const ChatPage = () => {
   };
 
   const handleSelectChat = (chatId) => {
-    // In a real app, you would load the chat history from the backend
-    setCurrentChatId(chatId);
-    setSessionId(chatId);
-    setMessages([{
-      id: 1,
-      message: "Chat history loaded. How can I continue helping you?",
-      isUser: false,
-      timestamp: new Date().toISOString()
-    }]);
+    loadConversation(chatId);
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-beige-50 via-white to-sand-50">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-beige-50 via-white to-sand-50">
       {/* Sidebar */}
       <Sidebar
         onNewChat={handleNewChat}
@@ -184,12 +297,12 @@ const ChatPage = () => {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className={`flex flex-col transition-all duration-300 ${activeArtifact ? 'flex-1 border-r border-sand-200' : 'flex-1'}`}>
         {/* Chat Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-sm border-b border-beige-200 px-6 py-4"
+          className="bg-navy-800/80 backdrop-blur-sm border-b border-navy-700 px-6 py-4"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -199,19 +312,34 @@ const ChatPage = () => {
               <div>
                 <h1 className="text-lg font-semibold text-warm-900">AI.BH Assistant</h1>
                 <p className="text-sm text-warm-600">
-                  {isLoading ? 'Thinking...' : 'Ready to help'}
+                  {isLoading ? 'Thinking...' : serviceHealth?.status === 'UP' ? 'Ready to help' : 'Service needs attention'}
                 </p>
               </div>
             </div>
             
             <div className="flex items-center space-x-2">
               <div className="flex items-center space-x-1 text-xs text-warm-500">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>Online</span>
+                {serviceHealth?.status === 'UP' ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span>Online</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <span>Degraded</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </motion.header>
+
+        {serviceHealth?.status !== 'UP' && (
+          <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800">
+            {healthMessage}
+          </div>
+        )}
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto chat-container">
@@ -244,7 +372,7 @@ const ChatPage = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleSendMessage(suggestion)}
-                      className="px-4 py-2 bg-beige-100 hover:bg-beige-200 text-warm-700 rounded-xl transition-colors border border-beige-300"
+                      className="px-4 py-2 bg-navy-800 hover:bg-navy-900 text-warm-700 rounded-xl transition-colors border border-beige-300"
                     >
                       {suggestion}
                     </motion.button>
@@ -262,8 +390,13 @@ const ChatPage = () => {
                     timestamp={msg.timestamp}
                     imageUrl={msg.imageUrl}
                     index={index}
+                    onOpenArtifact={setActiveArtifact}
                   />
                 ))}
+
+                <AnimatePresence>
+                  {isLoadingHistory && <TypingIndicator />}
+                </AnimatePresence>
                 
                 <AnimatePresence>
                   {isLoading && <TypingIndicator />}
@@ -278,9 +411,24 @@ const ChatPage = () => {
         {/* Input Area */}
         <ChatInput 
           onSendMessage={handleSendMessage}
-          disabled={isLoading}
+          disabled={isLoading || serviceHealth?.status !== 'UP'}
+          statusMessage={serviceHealth?.status === 'UP'
+            ? 'Ask anything. If project-specific knowledge is missing, upload text documents to improve answers.'
+            : healthMessage}
         />
       </div>
+      
+      {/* Artifact Panel (Split Screen) */}
+      <AnimatePresence>
+        {activeArtifact && (
+          <div className="flex-1 flex flex-col bg-white z-10 shadow-2xl relative min-w-0">
+            <ArtifactPanel 
+              artifact={activeArtifact} 
+              onClose={() => setActiveArtifact(null)} 
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

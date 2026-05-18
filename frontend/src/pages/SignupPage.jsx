@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bot, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -85,7 +85,7 @@ const SignupPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-white rounded-2xl shadow-xl p-8 border border-beige-200"
+          className="bg-navy-800 rounded-2xl shadow-xl p-8 border border-navy-700"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* First Name Field */}

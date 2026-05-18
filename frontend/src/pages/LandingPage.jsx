@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Bot, MessageCircle, Mic, Image, Sparkles, Users, Shield, Zap } from 'lucide-react';
@@ -40,7 +39,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-beige-50 via-white to-sand-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-beige-200 sticky top-0 z-50">
+      <header className="bg-navy-800/80 backdrop-blur-sm border-b border-navy-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <motion.div 
@@ -115,7 +114,7 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white/50">
+      <section className="py-20 bg-navy-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -140,7 +139,7 @@ const LandingPage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-beige-200"
+                className="bg-navy-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-navy-700"
               >
                 <div className="w-12 h-12 bg-gradient-to-br from-sand-500 to-sand-700 rounded-xl flex items-center justify-center mb-6">
                   <feature.icon className="w-6 h-6 text-white" />
@@ -174,7 +173,7 @@ const LandingPage = () => {
             </p>
             <Link 
               to="/signup" 
-              className="inline-flex items-center bg-white text-sand-700 font-semibold px-8 py-4 rounded-xl hover:bg-beige-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              className="inline-flex items-center bg-navy-800 text-sand-700 font-semibold px-8 py-4 rounded-xl hover:bg-navy-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
             >
               <Bot className="w-5 h-5 mr-2" />
               Create Your Account

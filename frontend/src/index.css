@@ -9,48 +9,48 @@
   }
   
   body {
-    @apply bg-beige-200 text-text;
+    @apply bg-navy-900 text-text selection:bg-primary-500 selection:text-white;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-medium px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl;
+    @apply bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-500 hover:to-secondary-500 text-white font-medium px-6 py-3 rounded-xl transition-all duration-300 shadow-[0_0_15px_rgba(0,229,255,0.4)] hover:shadow-[0_0_25px_rgba(0,229,255,0.6)];
   }
   
   .btn-secondary {
-    @apply bg-secondary-300 hover:bg-secondary-400 text-white font-medium px-6 py-3 rounded-xl transition-all duration-200 shadow-md;
+    @apply bg-navy-800 hover:bg-navy-700 text-text font-medium px-6 py-3 rounded-xl transition-all duration-200 border border-navy-600 shadow-md;
   }
   
   .input-field {
-    @apply w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
+    @apply w-full px-4 py-3 bg-navy-800 text-text border border-navy-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 placeholder-text-lighter;
   }
   
   .message-bubble {
-    @apply max-w-xs lg:max-w-md px-4 py-3 rounded-2xl break-words shadow-sm;
+    @apply max-w-xs lg:max-w-md px-5 py-3.5 rounded-2xl break-words shadow-md leading-relaxed;
   }
   
   .user-message {
-    @apply bg-gradient-to-r from-primary-600 to-primary-700 text-white ml-auto rounded-br-md;
+    @apply bg-gradient-to-br from-primary-600 to-secondary-600 text-white ml-auto rounded-br-sm shadow-[0_4px_15px_rgba(0,229,255,0.15)];
   }
   
   .ai-message {
-    @apply bg-white text-text mr-auto border border-gray-200 rounded-bl-md;
+    @apply bg-navy-800 text-text mr-auto border border-navy-700 rounded-bl-sm;
   }
   
   .card-dashboard {
-    @apply bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-100;
+    @apply bg-navy-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 border border-navy-700;
   }
   
   .sidebar {
-    @apply bg-gradient-to-b from-beige-100 to-beige-200 border-r border-gray-200;
+    @apply bg-navy-950 border-r border-navy-800;
   }
   
   .glass-effect {
-    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
+    @apply bg-navy-900/70 backdrop-blur-md border border-navy-700/50 shadow-lg;
   }
   
   .hover-lift {
-    @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-primary-500/30;
   }
 }

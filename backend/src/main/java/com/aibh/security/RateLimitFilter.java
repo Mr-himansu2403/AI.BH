@@ -38,40 +38,51 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         
         try {
+            // 1. Global IP-based rate limit
+            String ipKey = "global:" + getClientIpAddress(request);
+            if (!consumeToken(ipKey, RateLimitType.GLOBAL, response)) {
+                return;
+            }
+
+            // 2. Specific user/anonymous rate limit
             String key = getRateLimitKey(request);
             RateLimitType type = getRateLimitType();
             
-            Bucket bucket = rateLimitingService.getBucket(key, type);
-            ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-            
-            if (probe.isConsumed()) {
-                // Add rate limit headers
-                response.addHeader("X-RateLimit-Remaining", String.valueOf(probe.getRemainingTokens()));
-                response.addHeader("X-RateLimit-Type", type.name());
-                
+            if (consumeToken(key, type, response)) {
                 filterChain.doFilter(request, response);
-            } else {
-                // Rate limit exceeded
-                logger.warn("Rate limit exceeded for key: {} (type: {})", key, type);
-                
-                response.setStatus(429); // Too Many Requests
-                response.addHeader("X-RateLimit-Remaining", "0");
-                response.addHeader("X-RateLimit-Type", type.name());
-                response.addHeader("X-RateLimit-Retry-After", String.valueOf(probe.getNanosToWaitForRefill() / 1_000_000_000));
-                response.setContentType("application/json");
-                response.getWriter().write("""
-                    {
-                        "error": "Rate limit exceeded",
-                        "message": "Too many requests. Please try again later.",
-                        "retryAfter": %d
-                    }
-                    """.formatted(probe.getNanosToWaitForRefill() / 1_000_000_000));
             }
             
         } catch (Exception e) {
             logger.error("Error in rate limiting filter", e);
             // Continue with request if rate limiting fails
             filterChain.doFilter(request, response);
+        }
+    }
+
+    private boolean consumeToken(String key, RateLimitType type, HttpServletResponse response) throws IOException {
+        Bucket bucket = rateLimitingService.getBucket(key, type);
+        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+        
+        if (probe.isConsumed()) {
+            // Add rate limit headers
+            response.addHeader("X-RateLimit-Remaining-" + type.name(), String.valueOf(probe.getRemainingTokens()));
+            return true;
+        } else {
+            // Rate limit exceeded
+            logger.warn("Rate limit exceeded for key: {} (type: {})", key, type);
+            
+            response.setStatus(429); // Too Many Requests
+            response.addHeader("X-RateLimit-Retry-After-" + type.name(), String.valueOf(probe.getNanosToWaitForRefill() / 1_000_000_000));
+            response.setContentType("application/json");
+            response.getWriter().write("""
+                {
+                    "error": "Rate limit exceeded",
+                    "type": "%s",
+                    "message": "Too many requests. Please try again later.",
+                    "retryAfter": %d
+                }
+                """.formatted(type.name(), probe.getNanosToWaitForRefill() / 1_000_000_000));
+            return false;
         }
     }
     
@@ -103,6 +114,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             UserPrincipal user = (UserPrincipal) auth.getPrincipal();
             if ("ADMIN".equals(user.getRole())) {
                 return RateLimitType.ADMIN;
+            } else if ("ENTERPRISE".equals(user.getRole())) {
+                return RateLimitType.ENTERPRISE;
             } else {
                 return RateLimitType.USER;
             }

@@ -1,14 +1,22 @@
 package com.aibh.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
+@Schema(description = "Chat request payload")
 public class ChatRequest {
     
     @NotBlank(message = "Message cannot be empty")
+    @Schema(description = "User's message content", example = "Hello, how are you?")
     private String message;
     
+    @Schema(description = "Session ID for conversation context", example = "session_123456")
     private String sessionId;
+
+    @Schema(description = "URL of an image for multi-modal chat", example = "https://example.com/image.jpg")
     private String imageUrl;
+
+    @Schema(description = "Type of message (TEXT, IMAGE)", example = "TEXT", defaultValue = "TEXT")
     private String messageType = "TEXT";
     
     public ChatRequest() {}

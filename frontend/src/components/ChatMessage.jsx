@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 import { User, Bot, Volume2, Copy, Check } from 'lucide-react';
 import speechService from '../services/speechService';
@@ -9,7 +10,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 
-const ChatMessage = ({ message, isUser, timestamp, imageUrl, index }) => {
+const ChatMessage = ({ message, isUser, timestamp, imageUrl, index, onOpenArtifact }) => {
   const [copied, setCopied] = useState(false);
 
   const handleSpeak = () => {
@@ -69,7 +70,7 @@ const ChatMessage = ({ message, isUser, timestamp, imageUrl, index }) => {
             animate={{ opacity: 1, scale: 1 }}
             src={imageUrl} 
             alt="Uploaded content" 
-            className="max-w-full h-auto rounded-xl mb-3 border border-beige-200 shadow-md"
+            className="max-w-full h-auto rounded-xl mb-3 border border-navy-700 shadow-md"
           />
         )}
         
@@ -83,19 +84,42 @@ const ChatMessage = ({ message, isUser, timestamp, imageUrl, index }) => {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code({ node, inline, className, children, ...props }) {
+                code({ inline, className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');
-                  return !inline && match ? (
-                    <SyntaxHighlighter
-                      style={vscDarkPlus}
-                      language={match[1]}
-                      PreTag="div"
-                      {...props}
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
+                  const language = match ? match[1] : 'text';
+                  const codeString = String(children).replace(/\n$/, '');
+                  const isArtifactable = language === 'html' || language === 'xml' || language === 'javascript' || language === 'js' || language === 'react' || codeString.split('\n').length > 10;
+                  
+                  return !inline ? (
+                    <div className="relative group/code mt-4 mb-4">
+                      {isArtifactable && onOpenArtifact && (
+                        <button
+                          onClick={() => onOpenArtifact({ code: codeString, language })}
+                          className="absolute right-4 top-4 z-10 px-3 py-1.5 bg-sand-200/20 hover:bg-sand-200/40 text-sand-300 rounded-lg text-xs font-semibold flex items-center space-x-2 transition-colors border border-sand-600/30 backdrop-blur-sm opacity-0 group-hover/code:opacity-100"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                          </svg>
+                          <span>Open Artifact</span>
+                        </button>
+                      )}
+                      <div className="rounded-xl overflow-hidden border border-navy-800 shadow-xl">
+                        <div className="flex items-center px-4 py-2 bg-[#2D2D2D] border-b border-[#404040]">
+                          <span className="text-xs font-mono text-gray-400 capitalize">{language}</span>
+                        </div>
+                        <SyntaxHighlighter
+                          style={vscDarkPlus}
+                          language={language}
+                          PreTag="div"
+                          customStyle={{ margin: 0, padding: '1.5rem', background: '#1E1E1E', fontSize: '0.875rem' }}
+                          {...props}
+                        >
+                          {codeString}
+                        </SyntaxHighlighter>
+                      </div>
+                    </div>
                   ) : (
-                    <code className={className} {...props}>
+                    <code className="bg-sand-100 text-navy-800 px-1.5 py-0.5 rounded-md font-mono text-sm" {...props}>
                       {children}
                     </code>
                   );
@@ -115,7 +139,7 @@ const ChatMessage = ({ message, isUser, timestamp, imageUrl, index }) => {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handleSpeak}
-                className="p-2 bg-white rounded-lg shadow-md hover:bg-beige-50 transition-colors border border-beige-200"
+                className="p-2 bg-navy-800 rounded-lg shadow-md hover:bg-navy-700 transition-colors border border-navy-700"
                 title="Read aloud"
               >
                 <Volume2 className="w-4 h-4 text-warm-600" />
@@ -126,7 +150,7 @@ const ChatMessage = ({ message, isUser, timestamp, imageUrl, index }) => {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleCopy}
-              className="p-2 bg-white rounded-lg shadow-md hover:bg-beige-50 transition-colors border border-beige-200"
+              className="p-2 bg-navy-800 rounded-lg shadow-md hover:bg-navy-700 transition-colors border border-navy-700"
               title="Copy message"
             >
               {copied ? (
@@ -152,6 +176,15 @@ const ChatMessage = ({ message, isUser, timestamp, imageUrl, index }) => {
       </div>
     </motion.div>
   );
+};
+
+ChatMessage.propTypes = {
+  message: PropTypes.string.isRequired,
+  isUser: PropTypes.bool.isRequired,
+  timestamp: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
+  imageUrl: PropTypes.string,
+  index: PropTypes.number,
+  onOpenArtifact: PropTypes.func,
 };
 
 export default ChatMessage;

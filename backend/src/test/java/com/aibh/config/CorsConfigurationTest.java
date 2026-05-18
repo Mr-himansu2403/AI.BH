@@ -1,9 +1,12 @@
 package com.aibh.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -12,6 +15,7 @@ public class CorsConfigurationTest {
     @Test
     public void testCorsConfiguration() {
         SecurityConfig config = new SecurityConfig();
+        ReflectionTestUtils.setField(config, "allowedOriginPatterns", List.of("http://localhost:*", "https://app.ai-bh.com"));
         CorsConfigurationSource source = config.corsConfigurationSource();
         
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -23,7 +27,8 @@ public class CorsConfigurationTest {
         CorsConfiguration cors = source.getCorsConfiguration(request);
         
         assertNotNull(cors);
-        assertTrue(cors.getAllowedOrigins().contains("http://localhost:5173"));
+        assertTrue(cors.getAllowedOriginPatterns().contains("http://localhost:*"));
+        assertTrue(cors.getAllowedOriginPatterns().contains("https://app.ai-bh.com"));
         assertTrue(cors.getAllowedMethods().contains("OPTIONS"));
         assertTrue(cors.getAllowCredentials());
         assertTrue(cors.getExposedHeaders().contains("Authorization"));
