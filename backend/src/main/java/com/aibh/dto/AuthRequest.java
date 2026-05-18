@@ -14,8 +14,8 @@ public class AuthRequest {
     private String email;
     
     @NotBlank
-    @Size(min = 6, max = 100)
-    @Schema(description = "User password", example = "password123", minLength = 6, maxLength = 100)
+    @Size(min = 4, max = 100)
+    @Schema(description = "User password", example = "password123", minLength = 4, maxLength = 100)
     private String password;
     
     public AuthRequest() {}

@@ -28,7 +28,7 @@ public class User {
     private String email;
     
     @NotBlank
-    @Size(min = 8, max = 255)
+    @Size(min = 4, max = 255)
     @Column(nullable = false)
     @JsonIgnore
     private String password;
@@ -64,6 +64,10 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Conversation> conversations = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<ChatMessage> messages = new ArrayList<>();
     
     // Constructors
     public User() {}
@@ -118,6 +122,9 @@ public class User {
     
     public List<Conversation> getConversations() { return conversations; }
     public void setConversations(List<Conversation> conversations) { this.conversations = conversations; }
+    
+    public List<ChatMessage> getMessages() { return messages; }
+    public void setMessages(List<ChatMessage> messages) { this.messages = messages; }
     
     public String getFullName() {
         return firstName + " " + lastName;

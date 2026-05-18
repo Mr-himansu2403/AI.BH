@@ -24,8 +24,8 @@ public class SignupRequest {
     private String email;
     
     @NotBlank
-    @Size(min = 8, max = 100)
-    @Schema(description = "User password", example = "securePassword123", minLength = 8, maxLength = 100)
+    @Size(min = 4, max = 100)
+    @Schema(description = "User password", example = "securePassword123", minLength = 4, maxLength = 100)
     private String password;
     
     public SignupRequest() {}

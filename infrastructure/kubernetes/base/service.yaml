@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aibh-agent-engine-svc
+  namespace: aibh-prod
+spec:
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+  selector:
+    app: aibh-agent-engine
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aibh-memory-service-svc
+  namespace: aibh-prod
+spec:
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002
+  selector:
+    app: aibh-memory-service

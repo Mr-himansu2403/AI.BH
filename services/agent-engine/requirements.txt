@@ -1,0 +1,15 @@
+fastapi>=0.111.0
+uvicorn>=0.30.1
+pydantic>=2.7.2
+pydantic-settings>=2.2.1
+langgraph>=0.0.65
+langchain>=0.2.3
+langchain-core>=0.2.5
+langchain-openai>=0.1.8
+langchain-anthropic>=0.1.15
+langchain-google-genai>=1.0.6
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-instrumentation-fastapi>=0.46b0
+pyjwt>=2.8.0
+redis>=5.0.4

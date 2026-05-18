@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aibh-agent-engine
+  namespace: aibh-prod
+  labels:
+    app: aibh-agent-engine
+    version: v2026.1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: aibh-agent-engine
+  template:
+    metadata:
+      labels:
+        app: aibh-agent-engine
+        version: v2026.1
+    spec:
+      containers:
+        - name: agent-engine
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/aibh-agent-engine:v2026.1
+          ports:
+            - containerPort: 8001
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aibh-memory-service
+  namespace: aibh-prod
+  labels:
+    app: aibh-memory-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: aibh-memory-service
+  template:
+    metadata:
+      labels:
+        app: aibh-memory-service
+    spec:
+      containers:
+        - name: memory-service
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/aibh-memory-service:v2026.1
+          ports:
+            - containerPort: 8002
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"

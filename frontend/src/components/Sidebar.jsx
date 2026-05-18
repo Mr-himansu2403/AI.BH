@@ -50,8 +50,8 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-warm-900">AI.BH</h1>
-                <p className="text-xs text-warm-600">Assistant</p>
+                <h1 className="text-lg font-bold text-white">AI.BH</h1>
+                <p className="text-xs text-sand-400">Assistant</p>
               </div>
             </div>
           </div>
@@ -61,7 +61,7 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleNewChat}
-            className="w-full flex items-center justify-center space-x-2 bg-sand-600 hover:bg-sand-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl mb-6"
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-warm-500 to-warm-600 hover:from-warm-600 hover:to-warm-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl mb-6"
           >
             <Plus className="w-5 h-5" />
             <span>New Chat</span>
@@ -69,7 +69,7 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
 
           {/* Chat History */}
           <div className="flex-1 overflow-y-auto">
-            <h3 className="text-sm font-medium text-warm-700 mb-3 px-2">Recent Chats</h3>
+            <h3 className="text-sm font-medium text-sand-300 mb-3 px-2">Recent Chats</h3>
             <div className="space-y-2">
               {chatHistory.length > 0 ? (
                 chatHistory.map((chat, index) => (
@@ -79,16 +79,16 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
                     onClick={() => onSelectChat(chat.id)}
                     className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-200 text-left ${
                       currentChatId === chat.id
-                        ? 'bg-sand-100 border border-sand-200'
-                        : 'hover:bg-navy-800'
+                        ? 'bg-navy-800 border border-navy-700 shadow-md'
+                        : 'hover:bg-navy-800/60'
                     }`}
                   >
-                    <MessageCircle className="w-4 h-4 text-warm-500 flex-shrink-0" />
+                    <MessageCircle className="w-4 h-4 text-warm-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-warm-800 truncate">
+                      <p className="text-sm font-medium text-sand-100 truncate">
                         {chat.title || `Chat ${index + 1}`}
                       </p>
-                      <p className="text-xs text-warm-500 truncate">
+                      <p className="text-xs text-sand-400 truncate">
                         {chat.lastMessage || 'No messages yet'}
                       </p>
                     </div>
@@ -96,28 +96,28 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
                 ))
               ) : (
                 <div className="text-center py-8">
-                  <MessageCircle className="w-8 h-8 text-warm-300 mx-auto mb-2" />
-                  <p className="text-sm text-warm-500">No chats yet</p>
-                  <p className="text-xs text-warm-400">Start a conversation!</p>
+                  <MessageCircle className="w-8 h-8 text-navy-700 mx-auto mb-2" />
+                  <p className="text-sm text-sand-400">No chats yet</p>
+                  <p className="text-xs text-navy-600">Start a conversation!</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* User Profile Section */}
-          <div className="border-t border-beige-300 pt-4 mt-4">
+          <div className="border-t border-navy-800 pt-4 mt-4">
             <div className="relative">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 onClick={() => setShowProfile(!showProfile)}
                 className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-navy-800 transition-all duration-200"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-warm-400 to-warm-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-warm-400 to-warm-600 rounded-full flex items-center justify-center shadow-md">
                   <User className="w-4 h-4 text-white" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-warm-800">{user?.name || 'User'}</p>
-                  <p className="text-xs text-warm-500">{user?.email}</p>
+                  <p className="text-sm font-medium text-sand-100">{user?.name || 'User'}</p>
+                  <p className="text-xs text-sand-400">{user?.email}</p>
                 </div>
               </motion.button>
 
@@ -131,15 +131,15 @@ const Sidebar = ({ onNewChat, chatHistory = [], currentChatId, onSelectChat }) =
                     className="absolute bottom-full left-0 right-0 mb-2 bg-navy-800 rounded-xl shadow-xl border border-navy-700 overflow-hidden"
                   >
                     <button className="w-full flex items-center space-x-3 p-3 hover:bg-navy-700 transition-colors text-left">
-                      <Settings className="w-4 h-4 text-warm-500" />
-                      <span className="text-sm text-warm-700">Settings</span>
+                      <Settings className="w-4 h-4 text-warm-400" />
+                      <span className="text-sm text-sand-200">Settings</span>
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center space-x-3 p-3 hover:bg-red-50 transition-colors text-left border-t border-beige-100"
+                      className="w-full flex items-center space-x-3 p-3 hover:bg-red-950/30 transition-colors text-left border-t border-navy-700"
                     >
-                      <LogOut className="w-4 h-4 text-red-500" />
-                      <span className="text-sm text-red-600">Logout</span>
+                      <LogOut className="w-4 h-4 text-red-400" />
+                      <span className="text-sm text-red-400">Logout</span>
                     </button>
                   </motion.div>
                 )}

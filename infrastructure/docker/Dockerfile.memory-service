@@ -1,0 +1,13 @@
+FROM golang:1.21-alpine AS builder
+WORKDIR /app
+COPY services/memory-service/go.mod services/memory-service/go.sum* ./
+RUN go mod download
+COPY services/memory-service/main.go .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o memory-service main.go
+
+FROM alpine:latest  
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=builder /app/memory-service .
+EXPOSE 8002
+CMD ["./memory-service"]

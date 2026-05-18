@@ -1,6 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * ChatPage.jsx — Refactored to use Zustand stores
+ * State is now shared globally; no prop-drilling or Context re-render issues.
+ */
+
+import { useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Bot, AlertTriangle, CheckCircle2, Zap } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
@@ -9,285 +14,156 @@ import ArtifactPanel from '../components/ArtifactPanel';
 import { chatAPI } from '../services/api';
 import speechService from '../services/speechService';
 import toast from 'react-hot-toast';
+import { useChatStore, useArtifactStore, useHealthStore } from '../store';
 
 const ChatPage = () => {
-  const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeArtifact, setActiveArtifact] = useState(null);
-  const [sessionId, setSessionId] = useState(null);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [currentChatId, setCurrentChatId] = useState(null);
-  const [serviceHealth, setServiceHealth] = useState(null);
-  const [healthMessage, setHealthMessage] = useState('Checking AI service status...');
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  // ── Zustand stores ──────────────────────────────────────────────────────────
+  const {
+    messages, sessionId, chatHistory, currentChatId,
+    isLoading, isLoadingHistory,
+    addMessage, setMessages, setIsLoading,
+    initializeChat, setSessionId,
+    loadConversation, refreshConversations,
+    updateChatHistoryEntry,
+  } = useChatStore();
+
+  const { artifact, isOpen: artifactOpen, openArtifact, closeArtifact } = useArtifactStore();
+  const { health: serviceHealth, healthMessage, checkHealth } = useHealthStore();
+
   const messagesEndRef = useRef(null);
 
-  const mapConversationSummaries = useCallback((conversations) => (
-    conversations.map((chat) => ({
-      id: chat.sessionId,
-      title: chat.title,
-      lastMessage: chat.lastMessage,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt
-    }))
-  ), []);
+  // ── Session management (generate IDs on the frontend) ──────────────────────
+  const generateSessionId = useCallback(
+    () => 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    []
+  );
 
-  const generateSessionId = useCallback(() => {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }, []);
-
-  const hydrateMessages = useCallback((history) => {
-    const hydrated = [];
-
-    history.forEach((entry) => {
-      if (entry.userMessage) {
-        hydrated.push({
-          id: `${entry.id}-user`,
-          message: entry.userMessage,
-          isUser: true,
-          timestamp: entry.createdAt,
-          imageUrl: entry.imageUrl || null
-        });
-      }
-
-      if (entry.aiResponse) {
-        hydrated.push({
-          id: `${entry.id}-ai`,
-          message: entry.aiResponse,
-          isUser: false,
-          timestamp: entry.createdAt
-        });
-      }
-    });
-
-    return hydrated;
-  }, []);
-
-  const loadConversation = useCallback(async (chatId) => {
-    setIsLoadingHistory(true);
-    try {
-      const history = await chatAPI.getChatHistory(chatId);
-      setCurrentChatId(chatId);
-      setSessionId(chatId);
-      setMessages(hydrateMessages(history));
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-      toast.error('Failed to load conversation history.');
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, [hydrateMessages]);
-
-  const initializeChat = useCallback(() => {
-    const newSessionId = generateSessionId();
-    setSessionId(newSessionId);
-    setCurrentChatId(newSessionId);
-    
-    // Add welcome message
-    const welcomeMessage = {
-      id: 1,
-      message: "Welcome to AI.BH. I am your professional assistant. How can I help you today?",
-      isUser: false,
-      timestamp: new Date().toISOString()
-    };
-    
-    setMessages([welcomeMessage]);
-    
-    // Speak welcome message if speech is supported
-    setTimeout(() => {
-      if (speechService.isSupported()) {
-        speechService.speak(welcomeMessage.message);
-      }
-    }, 1000);
-  }, [generateSessionId]);
-
+  // ── Bootstrap: load existing conversations or start fresh ──────────────────
   const bootstrapChat = useCallback(async () => {
     try {
       const conversations = await chatAPI.getConversations();
-      const mappedConversations = mapConversationSummaries(conversations);
-      setChatHistory(mappedConversations);
-
-      if (mappedConversations.length > 0) {
-        await loadConversation(mappedConversations[0].id);
+      const mapped = conversations.map((c) => ({
+        id: c.sessionId, title: c.title,
+        lastMessage: c.lastMessage, createdAt: c.createdAt, updatedAt: c.updatedAt,
+      }));
+      // Use the store action, not setState directly
+      useChatStore.getState().setChatHistory(mapped);
+      if (mapped.length > 0) {
+        await loadConversation(mapped[0].id);
         return;
       }
-    } catch (error) {
-      console.error('Failed to bootstrap conversations:', error);
+    } catch {
+      // No conversations yet — start fresh
     }
-
     initializeChat();
-  }, [loadConversation, mapConversationSummaries, initializeChat]);
-
-  const checkHealth = useCallback(async () => {
-    try {
-      const health = await chatAPI.healthCheck();
-      setServiceHealth(health);
-      setHealthMessage(health.message || 'Service status updated.');
-    } catch (error) {
-      setServiceHealth({
-        status: 'DOWN',
-        checks: {},
-        message: 'Backend is unreachable. Check API deployment and network access.'
-      });
-      setHealthMessage('Backend is unreachable. Check API deployment and network access.');
-    }
-  }, []);
+  }, [loadConversation, initializeChat]);
 
   useEffect(() => {
     bootstrapChat();
     checkHealth();
-    const intervalId = setInterval(checkHealth, 30000);
-    return () => clearInterval(intervalId);
+    const id = setInterval(checkHealth, 30_000);
+    return () => clearInterval(id);
   }, [bootstrapChat, checkHealth]);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const refreshConversations = async () => {
-    try {
-      const conversations = await chatAPI.getConversations();
-      setChatHistory(mapConversationSummaries(conversations));
-    } catch (error) {
-      console.error('Failed to refresh conversations:', error);
-    }
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const updateChatHistory = useCallback((chatId, userMsg) => {
-    setChatHistory(prev => {
-      const existingChat = prev.find(chat => chat.id === chatId);
-      if (existingChat) {
-        return prev.map(chat => 
-          chat.id === chatId 
-            ? { ...chat, lastMessage: userMsg, updatedAt: new Date() }
-            : chat
-        );
-      } else {
-        return [...prev, {
-          id: chatId,
-          title: userMsg.length > 30 ? userMsg.substring(0, 30) + '...' : userMsg,
-          lastMessage: userMsg,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }];
-      }
-    });
-  }, []);
-
+  // ── Send message (streaming) ────────────────────────────────────────────────
   const handleSendMessage = async (messageText, imageData = null) => {
     if (!messageText && !imageData) return;
 
-    const userMessage = {
+    // Ensure we have a session
+    let activeSession = sessionId;
+    if (!activeSession) {
+      activeSession = generateSessionId();
+      setSessionId(activeSession);
+    }
+
+    const userMsg = {
       id: Date.now(),
       message: messageText,
       isUser: true,
       timestamp: new Date().toISOString(),
-      imageUrl: imageData
+      imageUrl: imageData || null,
     };
-
-    setMessages(prev => [...prev, userMessage]);
+    addMessage(userMsg);
     setIsLoading(true);
 
-    try {
-      if (serviceHealth?.status === 'DOWN') {
-        toast.error(serviceHealth?.message || 'Backend is unavailable right now.');
-      } else if (serviceHealth?.status === 'DEGRADED') {
-        toast(serviceHealth?.message || 'AI provider is degraded. Attempting fallback response.');
-      }
+    if (serviceHealth?.status === 'DOWN') {
+      toast.error(serviceHealth?.message || 'Backend is unavailable right now.');
+    }
 
+    try {
       if (imageData) {
-        const response = await chatAPI.sendImageMessage(messageText, imageData, sessionId);
-        const aiMessage = {
-          id: Date.now() + 1,
-          message: response.response,
-          isUser: false,
-          timestamp: response.timestamp
-        };
-        setMessages(prev => [...prev, aiMessage]);
-        updateChatHistory(sessionId, messageText);
+        // Image chat (non-streaming)
+        const resp = await chatAPI.sendImageMessage(messageText, imageData, activeSession);
+        addMessage({ id: Date.now() + 1, message: resp.response, isUser: false, timestamp: resp.timestamp });
+        updateChatHistoryEntry(activeSession, messageText);
         await refreshConversations();
-        if (speechService.isSupported()) {
-          setTimeout(() => speechService.speak(response.response), 500);
-        }
+        if (speechService.isSupported())
+          setTimeout(() => speechService.speak(resp.response), 500);
       } else {
-        // Streaming for text messages
-        const aiMessageId = Date.now() + 1;
-        const initialAiMessage = {
-          id: aiMessageId,
-          message: '',
-          isUser: false,
-          timestamp: new Date().toISOString()
-        };
-        
-        setMessages(prev => [...prev, initialAiMessage]);
-        
+        // Streaming text chat
+        const aiMsgId = Date.now() + 1;
+        addMessage({ id: aiMsgId, message: '', isUser: false, timestamp: new Date().toISOString() });
+
         let fullResponse = '';
         try {
-          await chatAPI.streamMessage(messageText, sessionId, (chunk) => {
+          await chatAPI.streamMessage(messageText, activeSession, (chunk) => {
             fullResponse += chunk;
-            setMessages(prev => prev.map(msg => 
-              msg.id === aiMessageId ? { ...msg, message: fullResponse } : msg
-            ));
+            // Use functional updater — safe against React batching
+            setMessages(
+              useChatStore.getState().messages.map((m) =>
+                m.id === aiMsgId ? { ...m, message: fullResponse } : m
+              )
+            );
           });
-        } catch (streamError) {
-          console.error('Streaming failed, falling back to standard response:', streamError);
-          const response = await chatAPI.sendMessage(messageText, sessionId);
-          fullResponse = response.response || response.error || 'The assistant could not generate a response.';
-          setMessages(prev => prev.map(msg =>
-            msg.id === aiMessageId ? { ...msg, message: fullResponse } : msg
-          ));
-          if (streamError?.message) {
-            toast.error(`Streaming failed: ${streamError.message}`);
+        } catch (streamErr) {
+          // Fallback to non-streaming
+          console.warn('Stream failed, falling back:', streamErr);
+          try {
+            const resp = await chatAPI.sendMessage(messageText, activeSession);
+            fullResponse = resp.response || 'The assistant could not generate a response.';
+          } catch {
+            fullResponse = '⚠️ Both streaming and fallback failed. Please check your AI provider configuration.';
           }
+          setMessages(
+            useChatStore.getState().messages.map((m) =>
+              m.id === aiMsgId ? { ...m, message: fullResponse } : m
+            )
+          );
         }
 
-        updateChatHistory(sessionId, messageText);
+        updateChatHistoryEntry(activeSession, messageText);
         await refreshConversations();
-        
-        if (speechService.isSupported()) {
+        if (speechService.isSupported())
           setTimeout(() => speechService.speak(fullResponse), 500);
-        }
       }
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error(error.message || 'Failed to send message. Please try again.');
-      
-      const errorMessage = {
+    } catch (err) {
+      console.error('handleSendMessage error:', err);
+      toast.error(err.message || 'Failed to send message.');
+      addMessage({
         id: Date.now() + 2,
-        message: error.message || 'The assistant is unavailable right now. Check AI provider configuration and try again.',
+        message: err.message || 'The assistant is unavailable. Check your API key configuration.',
         isUser: false,
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
+        timestamp: new Date().toISOString(),
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNewChat = () => {
-    const newSessionId = generateSessionId();
-    setSessionId(newSessionId);
-    setCurrentChatId(newSessionId);
-    setMessages([{
-      id: 1,
-      message: "New conversation started! How can I help you today?",
-      isUser: false,
-      timestamp: new Date().toISOString()
-    }]);
+    initializeChat();
+    closeArtifact();
   };
 
-  const handleSelectChat = (chatId) => {
-    loadConversation(chatId);
-  };
+  const handleSelectChat = (chatId) => loadConversation(chatId);
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-beige-50 via-white to-sand-50">
+    <div className="flex h-screen overflow-hidden bg-navy-900">
       {/* Sidebar */}
       <Sidebar
         onNewChat={handleNewChat}
@@ -296,9 +172,10 @@ const ChatPage = () => {
         onSelectChat={handleSelectChat}
       />
 
-      {/* Main Chat Area */}
-      <div className={`flex flex-col transition-all duration-300 ${activeArtifact ? 'flex-1 border-r border-sand-200' : 'flex-1'}`}>
-        {/* Chat Header */}
+      {/* Main Chat Column */}
+      <div className={`flex flex-col transition-all duration-300 ${artifactOpen ? 'flex-1 border-r border-navy-700' : 'flex-1'}`}>
+
+        {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -306,81 +183,77 @@ const ChatPage = () => {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-sand-500 to-sand-700 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-gradient-to-br from-warm-500 to-warm-700 rounded-xl flex items-center justify-center shadow-lg">
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-warm-900">AI.BH Assistant</h1>
-                <p className="text-sm text-warm-600">
+                <h1 className="text-lg font-semibold text-white">AI.BH Assistant</h1>
+                <p className="text-sm text-sand-400">
                   {isLoading ? 'Thinking...' : serviceHealth?.status === 'UP' ? 'Ready to help' : 'Service needs attention'}
                 </p>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-1 text-xs text-warm-500">
+            <div className="flex items-center space-x-3">
+              {/* Artifact history badge */}
+              {artifactOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center space-x-1 px-2 py-1 bg-warm-500/20 text-warm-300 rounded-lg text-xs font-semibold border border-warm-500/30"
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>Artifact Preview</span>
+                </motion.div>
+              )}
+              <div className="flex items-center space-x-1 text-xs text-sand-400">
                 {serviceHealth?.status === 'UP' ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span>Online</span>
-                  </>
+                  <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span>Online</span></>
                 ) : (
-                  <>
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    <span>Degraded</span>
-                  </>
+                  <><AlertTriangle className="w-4 h-4 text-warm-400" /><span>Degraded</span></>
                 )}
               </div>
             </div>
           </div>
         </motion.header>
 
+        {/* Health Banner */}
         {serviceHealth?.status !== 'UP' && (
-          <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800">
+          <div className="border-b border-warm-500/30 bg-warm-500/10 px-6 py-3 text-sm text-warm-300">
             {healthMessage}
           </div>
         )}
 
-        {/* Messages Area */}
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto chat-container">
           <div className="max-w-4xl mx-auto px-6 py-8">
             {messages.length === 0 ? (
-              // Empty State
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center py-16"
               >
-                <div className="w-20 h-20 bg-gradient-to-br from-sand-500 to-sand-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <div className="w-20 h-20 bg-gradient-to-br from-warm-500 to-warm-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
                   <Bot className="w-10 h-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-warm-900 mb-4">
-                  Welcome to AI.BH
-                </h2>
-                <p className="text-warm-600 mb-8 max-w-md mx-auto">
-                  Your intelligent assistant is ready to help you learn, create, and solve problems. Start a conversation below!
+                <h2 className="text-2xl font-bold text-white mb-4">Welcome to AI.BH</h2>
+                <p className="text-sand-300 mb-8 max-w-md mx-auto">
+                  Your intelligent assistant is ready to help you learn, create, and solve problems.
                 </p>
                 <div className="flex flex-wrap justify-center gap-3">
-                  {[
-                    "Explain a complex topic",
-                    "Help with coding",
-                    "Analyze an image",
-                    "Creative writing"
-                  ].map((suggestion, index) => (
+                  {['Explain a complex topic', 'Help with coding', 'Create an HTML app', 'Creative writing'].map((s, i) => (
                     <motion.button
-                      key={index}
+                      key={i}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => handleSendMessage(suggestion)}
-                      className="px-4 py-2 bg-navy-800 hover:bg-navy-900 text-warm-700 rounded-xl transition-colors border border-beige-300"
+                      onClick={() => handleSendMessage(s)}
+                      className="px-4 py-2 bg-navy-800 hover:bg-navy-700 text-sand-200 hover:text-white rounded-xl transition-colors border border-navy-700 shadow-md font-medium text-sm"
                     >
-                      {suggestion}
+                      {s}
                     </motion.button>
                   ))}
                 </div>
               </motion.div>
             ) : (
-              // Messages
               <>
                 {messages.map((msg, index) => (
                   <ChatMessage
@@ -390,42 +263,35 @@ const ChatPage = () => {
                     timestamp={msg.timestamp}
                     imageUrl={msg.imageUrl}
                     index={index}
-                    onOpenArtifact={setActiveArtifact}
+                    onOpenArtifact={openArtifact}
                   />
                 ))}
-
                 <AnimatePresence>
-                  {isLoadingHistory && <TypingIndicator />}
+                  {(isLoading || isLoadingHistory) && <TypingIndicator />}
                 </AnimatePresence>
-                
-                <AnimatePresence>
-                  {isLoading && <TypingIndicator />}
-                </AnimatePresence>
-                
                 <div ref={messagesEndRef} />
               </>
             )}
           </div>
         </div>
 
-        {/* Input Area */}
-        <ChatInput 
+        {/* Input */}
+        <ChatInput
           onSendMessage={handleSendMessage}
           disabled={isLoading || serviceHealth?.status !== 'UP'}
-          statusMessage={serviceHealth?.status === 'UP'
-            ? 'Ask anything. If project-specific knowledge is missing, upload text documents to improve answers.'
-            : healthMessage}
+          statusMessage={
+            serviceHealth?.status === 'UP'
+              ? 'Ask anything. Upload documents to improve domain-specific answers.'
+              : healthMessage
+          }
         />
       </div>
-      
-      {/* Artifact Panel (Split Screen) */}
+
+      {/* Artifact Split-Screen Panel */}
       <AnimatePresence>
-        {activeArtifact && (
+        {artifactOpen && artifact && (
           <div className="flex-1 flex flex-col bg-white z-10 shadow-2xl relative min-w-0">
-            <ArtifactPanel 
-              artifact={activeArtifact} 
-              onClose={() => setActiveArtifact(null)} 
-            />
+            <ArtifactPanel artifact={artifact} onClose={closeArtifact} />
           </div>
         )}
       </AnimatePresence>

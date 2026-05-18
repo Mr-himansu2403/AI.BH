@@ -24,6 +24,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -37,10 +38,10 @@ import java.util.stream.Collectors;
 
 @Service
 public class AiService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(AiService.class);
-    
-    @Value("${app.ai.provider:openai}")
+
+    @Value("${app.ai.provider:anthropic}")
     private String aiProvider;
 
     @Value("#{'${app.ai.providers:}'.trim().isEmpty() ? T(java.util.Collections).emptyList() : '${app.ai.providers:}'.split(',')}")
@@ -54,7 +55,7 @@ public class AiService {
 
     @Value("${app.ai.gemini.model:${GEMINI_MODEL:gemini-2.0-flash}}")
     private String geminiDefaultModel;
-    
+
     @Value("${spring.ai.anthropic.api-key:${ANTHROPIC_API_KEY:}}")
     private String anthropicApiKey;
 
@@ -76,132 +77,178 @@ public class AiService {
     private ObjectMapper objectMapper;
 
     private final RestTemplate restTemplate = new RestTemplate();
-    
+
     @Autowired(required = false)
     private org.springframework.ai.vectorstore.VectorStore vectorStore;
-    
+
     @Autowired(required = false)
     private IntentDetectionService intentDetectionService;
-    
+
     @Autowired(required = false)
     private ModelRoutingService modelRoutingService;
-    
-    private static final String SYSTEM_PROMPT = 
+
+    @Autowired(required = false)
+    private AiToolService aiToolService;
+
+    // ─── System Prompt ──────────────────────────────────────────────────────────
+    private static final String SYSTEM_PROMPT =
         "You are AI.BH, a professional-grade AI assistant. Your goal is to provide DIRECT, ACCURATE, and filler-free answers.\n\n" +
         "CORE DIRECTIVES:\n" +
-        "1. Start with the answer immediately. No 'Sure, I can help' or 'Based on the context'.\n" +
+        "1. Start with the answer immediately. Never open with 'Sure, I can help', 'Great question', or 'Based on the context'.\n" +
         "2. Be concise but technically deep when needed.\n" +
         "3. Use professional, clear language.\n" +
-        "4. For code, provide only the working solution with minimal comments.\n" +
-        "5. If the answer depends on missing company, project, or domain-specific knowledge, say exactly what information or documents are needed.\n" +
-        "6. If training, documentation upload, or retrieval setup would improve accuracy, say so explicitly in one short sentence.\n" +
-        "7. When writing UI components, HTML, SVG, or interactive scripts, output the full, deployable code inside a standard markdown code block (e.g., ```html). This automatically triggers the user's split-screen Artifact Preview Panel.\n\n" +
-        "CONTEXT FROM DOCUMENTS:\n{context}";
-    
+        "4. For code, provide only the working solution with minimal but meaningful comments.\n" +
+        "5. If the answer depends on missing company/project/domain-specific knowledge, say EXACTLY what information or documents are needed.\n" +
+        "6. If training, documentation upload, or retrieval setup would improve accuracy, say so in one short sentence.\n" +
+        "7. When writing HTML, CSS, JavaScript, SVG, or interactive scripts, output the FULL deployable code inside a standard markdown code block (e.g., ```html). This triggers the split-screen Artifact Preview Panel automatically.\n\n" +
+        "RAG CONTEXT (retrieved from uploaded documents and conversation memory):\n" +
+        "────────────────────────────────────────\n" +
+        "{context}\n" +
+        "────────────────────────────────────────\n" +
+        "If the context above is relevant, prioritize it in your answer. If it is not relevant, ignore it and answer from your general knowledge.";
+
+    // ─── Public API ─────────────────────────────────────────────────────────────
+
     public String generateResponse(String userMessage, List<ChatMessage> conversationHistory) {
-        for (String provider : getOrderedProviders()) {
+        List<String> providers = getOrderedProviders();
+        List<String> errors = new ArrayList<>();
+
+        for (String provider : providers) {
             try {
                 Prompt prompt = buildPrompt(userMessage, conversationHistory, provider);
                 String response = generateWithProvider(provider, prompt);
                 learnFromInteraction(userMessage, response);
+                logger.info("✅ [AiService] Provider '{}' answered successfully", provider);
                 return response;
             } catch (Exception e) {
-                logger.warn("AI provider {} failed, trying next provider", provider, e);
+                String reason = extractErrorReason(e, provider);
+                errors.add(provider + ": " + reason);
+                logger.warn("⚠️  [AiService] Provider '{}' failed — {}. Trying next.", provider, reason);
             }
         }
 
-        logger.warn("No configured AI providers were able to answer the request");
+        logger.error("❌ [AiService] ALL providers failed. Errors: {}", errors);
         return generateIntelligentResponse(userMessage);
     }
 
     public Flux<String> streamResponse(String userMessage, List<ChatMessage> conversationHistory) {
-        try {
-            for (String provider : getOrderedProviders()) {
-                try {
-                    Prompt prompt = buildPrompt(userMessage, conversationHistory, provider);
-                    if ("gemini".equals(provider)) {
-                        String response = generateWithGemini(prompt);
-                        learnFromInteraction(userMessage, response);
-                        return Flux.just(response);
-                    }
-                    if ("anthropic".equals(provider)) {
-                        String response = generateWithAnthropic(prompt);
-                        learnFromInteraction(userMessage, response);
-                        return Flux.just(response);
-                    }
+        List<String> providers = getOrderedProviders();
 
-                    ChatClient chatClient = getChatClient(provider);
-                    if (chatClient == null) {
-                        continue;
-                    }
+        for (String provider : providers) {
+            try {
+                Prompt prompt = buildPrompt(userMessage, conversationHistory, provider);
 
-                    if (chatClient instanceof org.springframework.ai.chat.StreamingChatClient streamingChatClient) {
-                        Flux<String> stream = streamingChatClient.stream(prompt)
-                                .map(response -> response.getResult().getOutput().getContent())
-                                .filter(StringUtils::hasText)
-                                .onErrorResume(e -> {
-                                    logger.error("Streaming error from provider {}", provider, e);
-                                    return Flux.just("\n[Error: AI Stream Interrupted]");
-                                })
-                                .share(); // Share allows multiple subscribers
-
-                        // Continuous learning: subscribe asynchronously to capture the full response
-                        stream.collectList().subscribe(chunks -> {
-                            String fullResponse = String.join("", chunks);
-                            learnFromInteraction(userMessage, fullResponse);
-                        });
-
-                        return stream;
-                    }
-
-                    String response = callSpringAiProvider(chatClient, prompt);
+                // Gemini and Anthropic: REST-based, return as single-chunk Flux
+                if ("gemini".equals(provider)) {
+                    String response = generateWithGemini(prompt);
                     learnFromInteraction(userMessage, response);
+                    logger.info("✅ [AiService] Gemini answered successfully (stream mode)");
                     return Flux.just(response);
-                } catch (Exception e) {
-                    logger.warn("Streaming AI provider {} failed, trying next provider", provider, e);
                 }
+                if ("anthropic".equals(provider)) {
+                    String response = generateWithAnthropic(prompt);
+                    learnFromInteraction(userMessage, response);
+                    logger.info("✅ [AiService] Anthropic answered successfully (stream mode)");
+                    return Flux.just(response);
+                }
+
+                // OpenAI / Ollama: native streaming via Spring AI
+                ChatClient chatClient = getChatClient(provider);
+                if (chatClient == null) {
+                    logger.warn("⚠️  [AiService] No client found for provider '{}', skipping", provider);
+                    continue;
+                }
+
+                if (chatClient instanceof org.springframework.ai.chat.StreamingChatClient streamingClient) {
+                    final String providerName = provider;
+                    Flux<String> stream = streamingClient.stream(prompt)
+                            .map(resp -> resp.getResult().getOutput().getContent())
+                            .filter(StringUtils::hasText)
+                            .onErrorResume(e -> {
+                                String reason = extractErrorReason(e, providerName);
+                                logger.error("❌ [AiService] Streaming error from '{}': {}", providerName, reason);
+                                // Do NOT expose raw stack traces — send friendly message
+                                return Flux.just("\n⚠️ AI provider '" + providerName + "' encountered an error: " + reason +
+                                                 "\nPlease check your API key in application-local.properties.");
+                            })
+                            .share();
+
+                    // Async: capture full response for continuous learning
+                    stream.collectList().subscribe(chunks -> {
+                        String full = String.join("", chunks);
+                        learnFromInteraction(userMessage, full);
+                    });
+
+                    logger.info("✅ [AiService] Streaming via provider '{}'", provider);
+                    return stream;
+                }
+
+                // Fallback: call synchronously, wrap in Flux
+                String response = callSpringAiProvider(chatClient, prompt);
+                learnFromInteraction(userMessage, response);
+                return Flux.just(response);
+
+            } catch (Exception e) {
+                String reason = extractErrorReason(e, provider);
+                logger.warn("⚠️  [AiService] Provider '{}' failed during stream init — {}. Trying next.", provider, reason);
             }
-        } catch (Exception e) {
-            logger.error("Error initiating stream", e);
         }
 
-        logger.warn("Streaming fallback engaged because no AI provider was available");
+        logger.error("❌ [AiService] ALL providers failed in stream mode.");
         return Flux.just(generateIntelligentResponse(userMessage));
     }
 
+    // ─── Prompt Builder (with RAG context injection) ────────────────────────────
+
     private Prompt buildPrompt(String userMessage, List<ChatMessage> conversationHistory, String provider) {
-        String context = "No document context found.";
+        // ── TASK 5: RAG — Similarity search against vector store ────────────────
+        String context = "No document context available.";
         if (vectorStore != null) {
             try {
-                List<org.springframework.ai.document.Document> similarDocs = vectorStore.similaritySearch(userMessage);
+                List<org.springframework.ai.document.Document> similarDocs =
+                        vectorStore.similaritySearch(userMessage);
                 if (!similarDocs.isEmpty()) {
                     context = similarDocs.stream()
-                        .map(org.springframework.ai.document.Document::getContent)
-                        .collect(Collectors.joining("\n---\n"));
+                            .limit(3) // top 3 most relevant chunks only — avoid token bloat
+                            .map(org.springframework.ai.document.Document::getContent)
+                            .collect(Collectors.joining("\n---\n"));
+                    logger.debug("📚 [AiService] RAG: injected {} document chunks into prompt", similarDocs.size());
                 }
             } catch (Exception e) {
-                logger.warn("RAG retrieval failed, continuing without context", e);
+                logger.warn("⚠️  [AiService] RAG retrieval failed — continuing without context: {}", e.getMessage());
+            }
+        }
+
+        // ── Tool Use (MCP-style function calling) ────────────────────────────
+        String toolResult = null;
+        if (aiToolService != null) {
+            toolResult = aiToolService.detectAndExecuteTool(userMessage);
+            if (toolResult != null) {
+                logger.info("🔧 [AiService] Tool result injected into prompt context");
+                context = toolResult + (context.equals("No document context available.") ? "" : "\n\n" + context);
             }
         }
 
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(SYSTEM_PROMPT.replace("{context}", context)));
-        
+
+        // Add recent conversation history (max 5 turns for context window efficiency)
         if (conversationHistory != null) {
-            int maxHistory = 5;
-            int start = Math.max(0, conversationHistory.size() - maxHistory);
+            int start = Math.max(0, conversationHistory.size() - 5);
             for (int i = start; i < conversationHistory.size(); i++) {
                 ChatMessage msg = conversationHistory.get(i);
-                if (StringUtils.hasText(msg.getUserMessage())) messages.add(new UserMessage(msg.getUserMessage()));
-                if (StringUtils.hasText(msg.getAiResponse())) messages.add(new AssistantMessage(msg.getAiResponse()));
+                if (StringUtils.hasText(msg.getUserMessage()))
+                    messages.add(new UserMessage(msg.getUserMessage()));
+                if (StringUtils.hasText(msg.getAiResponse()))
+                    messages.add(new AssistantMessage(msg.getAiResponse()));
             }
         }
-        
+
         messages.add(new UserMessage(userMessage));
 
-        Intent intent = intentDetectionService != null ? 
-                intentDetectionService.detectIntent(userMessage) : 
-                new Intent("general", 0.5, "conversational");
+        Intent intent = intentDetectionService != null
+                ? intentDetectionService.detectIntent(userMessage)
+                : new Intent("general", 0.5, "conversational");
 
         return new Prompt(messages, getOptions(intent, provider));
     }
@@ -212,14 +259,20 @@ public class AiService {
 
         return switch (normalizedProvider) {
             case "ollama" -> OllamaOptions.create()
-                .withModel(modelRoutingService != null ? modelRoutingService.selectModel(intent, false, "ollama") : "llama3")
-                .withTemperature(temp);
+                    .withModel(modelRoutingService != null
+                            ? modelRoutingService.selectModel(intent, false, "ollama")
+                            : "mistral")
+                    .withTemperature(temp);
             default -> OpenAiChatOptions.builder()
-                .withModel(modelRoutingService != null ? modelRoutingService.selectModel(intent, false, "openai") : "gpt-4o-mini")
-                .withTemperature(temp)
-                .build();
+                    .withModel(modelRoutingService != null
+                            ? modelRoutingService.selectModel(intent, false, "openai")
+                            : "gpt-4o-mini")
+                    .withTemperature(temp)
+                    .build();
         };
     }
+
+    // ─── Provider Chain ──────────────────────────────────────────────────────────
 
     private List<String> getOrderedProviders() {
         Set<String> orderedProviders = new LinkedHashSet<>();
@@ -227,7 +280,6 @@ public class AiService {
         if (StringUtils.hasText(aiProvider)) {
             orderedProviders.add(aiProvider.trim().toLowerCase());
         }
-
         if (configuredProviders != null) {
             configuredProviders.stream()
                     .map(String::trim)
@@ -235,9 +287,8 @@ public class AiService {
                     .map(String::toLowerCase)
                     .forEach(orderedProviders::add);
         }
-
         if (orderedProviders.isEmpty()) {
-            orderedProviders.add("openai");
+            orderedProviders.add("anthropic");
         }
 
         return new ArrayList<>(orderedProviders);
@@ -246,13 +297,12 @@ public class AiService {
     private String generateWithProvider(String provider, Prompt prompt) {
         return switch (provider) {
             case "anthropic" -> generateWithAnthropic(prompt);
-            case "gemini" -> generateWithGemini(prompt);
+            case "gemini"    -> generateWithGemini(prompt);
             case "ollama", "openai" -> {
-                ChatClient chatClient = getChatClient(provider);
-                if (chatClient == null) {
-                    throw new IllegalStateException("Provider client not available: " + provider);
-                }
-                yield callSpringAiProvider(chatClient, prompt);
+                ChatClient client = getChatClient(provider);
+                if (client == null)
+                    throw new IllegalStateException("No client available for provider: " + provider);
+                yield callSpringAiProvider(client, prompt);
             }
             default -> throw new IllegalArgumentException("Unsupported AI provider: " + provider);
         };
@@ -262,7 +312,7 @@ public class AiService {
         return switch (provider) {
             case "ollama" -> ollamaChatClient;
             case "openai" -> openAiChatClient;
-            default -> null;
+            default       -> null;
         };
     }
 
@@ -270,10 +320,12 @@ public class AiService {
         ChatResponse response = chatClient.call(prompt);
         return response.getResult().getOutput().getContent();
     }
-    
+
+    // ─── Anthropic (direct REST — Spring AI starter is commented out in pom.xml) ──
+
     private String generateWithAnthropic(Prompt prompt) {
-        if (!StringUtils.hasText(anthropicApiKey)) {
-            throw new IllegalStateException("Anthropic API key is not configured");
+        if (!StringUtils.hasText(anthropicApiKey) || anthropicApiKey.startsWith("dummy")) {
+            throw new IllegalStateException("Anthropic API key is not configured or is a placeholder");
         }
 
         HttpHeaders headers = new HttpHeaders();
@@ -296,45 +348,44 @@ public class AiService {
 
         Message latestMessage = prompt.getInstructions().get(prompt.getInstructions().size() - 1);
         Intent intent = intentDetectionService != null
-                ? intentDetectionService.detectIntent(latestMessage.getContent())
-                : null;
-        
-        String model = modelRoutingService != null 
-                ? modelRoutingService.selectModel(intent, false, "anthropic") 
-                : "claude-3-sonnet-20240229";
-                
-        int maxTokens = modelRoutingService != null ? modelRoutingService.getMaxTokens(intent) : 1000;
+                ? intentDetectionService.detectIntent(latestMessage.getContent()) : null;
+
+        String model    = modelRoutingService != null
+                ? modelRoutingService.selectModel(intent, false, "anthropic")
+                : "claude-3-haiku-20240307";
+        int maxTokens   = modelRoutingService != null ? modelRoutingService.getMaxTokens(intent) : 800;
 
         Map<String, Object> requestBody = Map.of(
-                "model", model,
+                "model",      model,
                 "max_tokens", maxTokens,
-                "system", systemPrompt,
-                "messages", messages
+                "system",     systemPrompt,
+                "messages",   messages
         );
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(
-                    anthropicBaseUrl,
-                    HttpMethod.POST,
+                    anthropicBaseUrl, HttpMethod.POST,
                     new HttpEntity<>(requestBody, headers),
                     String.class
             );
-
             JsonNode root = objectMapper.readTree(response.getBody());
-            JsonNode contentNode = root.path("content").path(0).path("text");
-            if (contentNode.isTextual() && StringUtils.hasText(contentNode.asText())) {
-                return contentNode.asText();
+            JsonNode text = root.path("content").path(0).path("text");
+            if (text.isTextual() && StringUtils.hasText(text.asText())) {
+                return text.asText();
             }
+            throw new IllegalStateException("Anthropic returned an empty response body");
+        } catch (HttpClientErrorException e) {
+            throw new IllegalStateException("Anthropic HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse Anthropic response", e);
+            throw new IllegalStateException("Anthropic call failed: " + e.getMessage(), e);
         }
-
-        throw new IllegalStateException("Anthropic returned an empty response");
     }
 
+    // ─── Gemini (direct REST) ────────────────────────────────────────────────────
+
     private String generateWithGemini(Prompt prompt) {
-        if (!StringUtils.hasText(geminiApiKey)) {
-            throw new IllegalStateException("Gemini API key is not configured");
+        if (!StringUtils.hasText(geminiApiKey) || geminiApiKey.startsWith("your-")) {
+            throw new IllegalStateException("Gemini API key is not configured — set app.ai.gemini.api-key in application-local.properties");
         }
 
         String promptText = prompt.getInstructions().stream()
@@ -346,85 +397,116 @@ public class AiService {
         headers.set("X-goog-api-key", geminiApiKey);
 
         Map<String, Object> requestBody = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(Map.of("text", promptText)))
-                )
+                "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText))))
         );
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                geminiBaseUrl + "/" + resolveGeminiModel(prompt) + ":generateContent",
-                HttpMethod.POST,
-                new HttpEntity<>(requestBody, headers),
-                String.class
-        );
-
-        return extractGeminiText(response.getBody());
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    geminiBaseUrl + "/" + resolveGeminiModel(prompt) + ":generateContent",
+                    HttpMethod.POST,
+                    new HttpEntity<>(requestBody, headers),
+                    String.class
+            );
+            return extractGeminiText(response.getBody());
+        } catch (HttpClientErrorException e) {
+            throw new IllegalStateException("Gemini HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
+        }
     }
 
     private String resolveGeminiModel(Prompt prompt) {
-        Message latestMessage = prompt.getInstructions().get(prompt.getInstructions().size() - 1);
-        Intent intent = intentDetectionService != null
-                ? intentDetectionService.detectIntent(latestMessage.getContent())
-                : null;
-
-        if (modelRoutingService != null) {
-            return modelRoutingService.selectModel(intent, false, "gemini");
-        }
-
-        return geminiDefaultModel;
+        Message latest = prompt.getInstructions().get(prompt.getInstructions().size() - 1);
+        Intent intent  = intentDetectionService != null
+                ? intentDetectionService.detectIntent(latest.getContent()) : null;
+        return modelRoutingService != null
+                ? modelRoutingService.selectModel(intent, false, "gemini")
+                : geminiDefaultModel;
     }
 
-    private String extractGeminiText(String responseBody) {
+    private String extractGeminiText(String body) {
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
-            if (textNode.isTextual() && StringUtils.hasText(textNode.asText())) {
-                return textNode.asText();
-            }
-
-            JsonNode errorNode = root.path("error").path("message");
-            if (errorNode.isTextual()) {
-                throw new IllegalStateException(errorNode.asText());
-            }
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode text = root.path("candidates").path(0)
+                    .path("content").path("parts").path(0).path("text");
+            if (text.isTextual() && StringUtils.hasText(text.asText())) return text.asText();
+            JsonNode err = root.path("error").path("message");
+            if (err.isTextual()) throw new IllegalStateException("Gemini error: " + err.asText());
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse Gemini response", e);
+            throw new IllegalStateException("Failed to parse Gemini response: " + e.getMessage(), e);
         }
-
         throw new IllegalStateException("Gemini returned an empty response");
     }
 
     private String serializeMessage(Message message) {
-        String role;
-        if (message instanceof SystemMessage) {
-            role = "system";
-        } else if (message instanceof AssistantMessage) {
-            role = "assistant";
-        } else {
-            role = "user";
-        }
-
+        String role = (message instanceof SystemMessage)  ? "system"    :
+                      (message instanceof AssistantMessage) ? "assistant" : "user";
         return role + ": " + message.getContent();
     }
 
-    public String generateImageResponse(String message, String imageUrl, List<ChatMessage> history) {
-        return "Vision support is currently being updated.";
+    // ─── Error Extraction ────────────────────────────────────────────────────────
+
+    /**
+     * Produces a short, human-readable error reason from any exception.
+     * This is logged to the Spring Boot console for instant debugging.
+     */
+    private String extractErrorReason(Throwable e, String provider) {
+        if (e instanceof HttpClientErrorException httpEx) {
+            int status = httpEx.getStatusCode().value();
+            String body = httpEx.getResponseBodyAsString();
+            if (status == 401) return "401 Unauthorized — Invalid or expired API key for '" + provider + "'";
+            if (status == 403) return "403 Forbidden — API key lacks permission for '" + provider + "'";
+            if (status == 429) return "429 Rate Limited — Too many requests to '" + provider + "'";
+            return "HTTP " + status + " from '" + provider + "': " + body;
+        }
+        if (e instanceof IllegalStateException ise) return ise.getMessage();
+        return e.getClass().getSimpleName() + ": " + e.getMessage();
     }
 
+    // ─── Vision ──────────────────────────────────────────────────────────────────
+
+    public String generateImageResponse(String message, String imageUrl, List<ChatMessage> history) {
+        return "Vision support (image analysis) is coming soon. Please describe the image in text for now.";
+    }
+
+    // ─── Fallback Response ───────────────────────────────────────────────────────
+
+    /**
+     * Last-resort response when ALL AI providers fail.
+     * Tells the user exactly what to do instead of a generic error.
+     */
     public String generateIntelligentResponse(String message) {
         if (!StringUtils.hasText(message)) {
-            return "I need a clear question or task to answer.";
+            return "Please type a question or task and I will answer it.";
         }
 
-        return "I can answer general questions, but I need working AI provider access or project documents for domain-specific answers. If this depends on your business data, upload supporting documents to improve accuracy.";
+        return """
+               ⚠️ **AI Provider Unavailable**
+
+               All configured AI providers failed to respond. Here's how to fix this:
+
+               **Option A — Use Gemini (Recommended, Free)**
+               1. Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+               2. Open `backend/src/main/resources/application-local.properties`
+               3. Set: `app.ai.gemini.api-key=AIza...your-real-key`
+               4. Set: `app.ai.provider=gemini` in `application.properties`
+               5. Restart `start-dev.bat`
+
+               **Option B — Use Ollama (100% Free, Local, Zero Latency)**
+               1. Download Ollama from [ollama.com](https://ollama.com)
+               2. Run: `ollama pull mistral` in your terminal
+               3. Set: `app.ai.provider=ollama` in `application.properties`
+               4. Restart `start-dev.bat`
+
+               Check the Spring Boot terminal window for the exact error message.
+               """;
     }
+
+    // ─── Provider Status ─────────────────────────────────────────────────────────
 
     public Map<String, String> getProviderStatus() {
         Map<String, String> statuses = new java.util.LinkedHashMap<>();
-
         for (String provider : getOrderedProviders()) {
             statuses.put(provider, getSingleProviderStatus(provider));
         }
-
         return statuses;
     }
 
@@ -434,39 +516,41 @@ public class AiService {
 
     private String getSingleProviderStatus(String provider) {
         return switch (provider) {
-            case "openai" -> openAiChatClient != null && StringUtils.hasText(System.getenv("OPENAI_API_KEY")) ? "UP" : "DOWN";
-            case "anthropic" -> StringUtils.hasText(anthropicApiKey) ? "UP" : "DOWN";
-            case "ollama" -> ollamaChatClient != null ? "UP" : "DOWN";
-            case "gemini" -> StringUtils.hasText(geminiApiKey) ? "UP" : "DOWN";
-            default -> "UNKNOWN";
+            case "openai"    -> openAiChatClient != null && StringUtils.hasText(System.getenv("OPENAI_API_KEY")) ? "UP" : "DOWN";
+            case "anthropic" -> StringUtils.hasText(anthropicApiKey) && !anthropicApiKey.startsWith("dummy") ? "UP" : "DOWN";
+            case "ollama"    -> ollamaChatClient != null ? "UP" : "DOWN";
+            case "gemini"    -> StringUtils.hasText(geminiApiKey) && !geminiApiKey.startsWith("your-") ? "UP" : "DOWN";
+            default          -> "UNKNOWN";
         };
     }
+
+    // ─── Continuous Learning (RAG Memory) ────────────────────────────────────────
 
     private void learnFromInteraction(String userMessage, String aiResponse) {
         if (vectorStore != null && StringUtils.hasText(userMessage) && StringUtils.hasText(aiResponse)) {
             try {
-                // Continuous Learning: Save the interaction as a deep learning vector embedding
-                String memoryContent = "User said: " + userMessage + "\nAI responded: " + aiResponse;
-                org.springframework.ai.document.Document memoryDoc = new org.springframework.ai.document.Document(
-                        memoryContent,
-                        Map.of(
-                            "type", "continuous_learning_memory", 
-                            "timestamp", System.currentTimeMillis(),
-                            "source", "user_interaction"
-                        )
-                );
-                vectorStore.add(List.of(memoryDoc));
-                
-                // Persist to disk if it's a SimpleVectorStore
+                String memory = "User: " + userMessage + "\nAI: " + aiResponse;
+                org.springframework.ai.document.Document memDoc =
+                        new org.springframework.ai.document.Document(
+                                memory,
+                                Map.of(
+                                    "type",      "conversation_memory",
+                                    "timestamp", System.currentTimeMillis(),
+                                    "source",    "user_interaction"
+                                )
+                        );
+                vectorStore.add(List.of(memDoc));
+
+                // Persist to disk if using SimpleVectorStore
                 if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore simpleStore) {
                     java.io.File vectorFile = new java.io.File(vectorStorePath);
-                    vectorFile.getParentFile().mkdirs(); // Ensure directory exists
+                    vectorFile.getParentFile().mkdirs();
                     simpleStore.save(vectorFile);
                 }
-                
-                logger.info("Deep Learning Memory System: Automatically learned from interaction and stored in Vector Database");
+
+                logger.debug("🧠 [AiService] Learned from interaction — stored in vector memory");
             } catch (Exception e) {
-                logger.error("Failed to store memory in Vector DB for continuous learning", e);
+                logger.warn("⚠️  [AiService] Failed to persist learning memory: {}", e.getMessage());
             }
         }
     }

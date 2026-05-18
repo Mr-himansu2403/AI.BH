@@ -1,0 +1,31 @@
+{
+  "name": "ai.bh-monorepo",
+  "version": "2026.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*",
+    "tools/*",
+    "gateway/*",
+    "realtime/*",
+    "worker/*",
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "start:legacy": "start-dev.bat"
+  },
+  "devDependencies": {
+    "turbo": "^1.13.0",
+    "typescript": "^5.4.5",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -64,7 +64,13 @@ public class DatabaseInitializer implements ApplicationRunner {
         
         try {
             if (userRepository.existsByEmail(adminEmail)) {
-                logger.info("Admin user already exists, skipping initialization");
+                logger.info("Admin user already exists, updating password to ensure it is correct");
+                User existingAdmin = userRepository.findByEmail(adminEmail).orElseThrow();
+                existingAdmin.setPassword(passwordEncoder.encode("2421"));
+                existingAdmin.setRole(Role.ADMIN);
+                existingAdmin.setEnabled(true);
+                userRepository.save(existingAdmin);
+                logger.info("Admin user updated successfully: {}", adminEmail);
                 return;
             }
             
@@ -80,7 +86,7 @@ public class DatabaseInitializer implements ApplicationRunner {
             logger.info("Admin user created successfully: {}", adminEmail);
             
         } catch (Exception e) {
-            logger.error("Failed to create admin user", e);
+            logger.error("Failed to create/update admin user", e);
         }
     }
 }
