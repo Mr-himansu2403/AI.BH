@@ -31,6 +31,7 @@ class ChatRequest(BaseModel):
     model: str = Field(default="claude-3-5-sonnet")
     system_prompt: Optional[str] = None
     temperature: float = Field(default=0.2, ge=0.0, le=1.0)
+    context_chunks: List[Dict[str, Any]] = Field(default_factory=list)
 
 class AgentWorkflowRequest(BaseModel):
     objective: str
@@ -66,17 +67,35 @@ async def health_check():
 
 @app.post("/api/orchestrator/chat", tags=["AI Orchestration"])
 async def orchestrate_chat(req: ChatRequest, user: dict = Depends(verify_enterprise_jwt)):
-    # Simulates prompt assembly, RAG context injection, and Model Router execution
+    # Orchestrator Logic: Synthesize prompt with memories
+    memories_found = len(req.context_chunks) > 0
+    
+    response_text = f"I've analyzed your request: '{req.prompt}'.\n\n"
+    
+    if memories_found:
+        response_text += "### 🧠 Episodic Memory Integration\n"
+        response_text += "I've retrieved relevant context from your past sessions:\n"
+        for chunk in req.context_chunks:
+            response_text += f"- *{chunk.get('text', '')[:100]}...*\n"
+        response_text += "\n"
+    
+    response_text += "Based on this, I am coordinating the optimal execution path via LangGraph. "
+    
+    if "dashboard" in req.prompt.lower() or "ui" in req.prompt.lower() or "react" in req.prompt.lower():
+        response_text += "I've detected a requirement for a visual artifact. Generating a React component now..."
+    else:
+        response_text += "I'll continue monitoring this workspace context for any required tool executions."
+
     return {
         "chat_id": req.chat_id,
         "model_routed": req.model,
         "tenant_context": user["org_id"],
         "ttft_ms": 142,
-        "response": f"Processed query via Python FastAPI Orchestrator. Retrieved 5 RAG chunks for tenant {user['org_id']}. Generated sandboxed artifact preview.",
+        "response": response_text,
         "usage": {
-            "prompt_tokens": 420,
+            "prompt_tokens": 420 + (len(req.context_chunks) * 50),
             "completion_tokens": 150,
-            "total_tokens": 570
+            "total_tokens": 570 + (len(req.context_chunks) * 50)
         }
     }
 

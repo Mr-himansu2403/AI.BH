@@ -1,8 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Bot, ArrowRight, Sparkles, Cpu, Layers, ShieldCheck } from 'lucide-react';
-import Link from 'next/link';
+import { Bot, Sparkles, Cpu, Layers, ShieldCheck } from 'lucide-react';
+import LoginModal from '@/components/LoginModal';
 
 export default function HomePage() {
   return (
@@ -57,17 +57,16 @@ export default function HomePage() {
               <h3 className="text-xl font-bold text-white mb-3">Autonomous LangGraph Agents</h3>
               <p className="text-sand-300 text-sm leading-relaxed">
                 Deploy cyclic reasoning graphs with built-in planner loops, MCP tool execution runners, reflection critiques, and automatic self-correction retries.
-              import Link from 'next/link';
-              import LoginModal from '@/components/LoginModal';
+              </p>
+            </div>
+          </motion.div>
+        </div>
 
-              export default function HomePage() {
-                return (
-              ...
-                      {/* CTA Section */}
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <LoginModal />
-                      </motion.div>
-                    </div>
-                  </div>
-                );
-              }
+        {/* CTA Section */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <LoginModal />
+        </motion.div>
+      </div>
+    </div>
+  );
+}

@@ -8,9 +8,31 @@ export async function POST(req: NextRequest) {
     const { chatId, prompt, model, systemPrompt } = body;
 
     // Forward the request to the Python FastAPI Orchestrator
-    // In local development, this is typically http://localhost:8001
     const AGENT_ENGINE_URL = process.env.AGENT_ENGINE_URL || 'http://localhost:8001/api/orchestrator/chat';
+    const MEMORY_SERVICE_URL = process.env.MEMORY_SERVICE_URL || 'http://localhost:8002/api/memory/query';
 
+    // 1. Fetch Episodic Memories from Go Memory Service
+    let contextChunks = [];
+    try {
+      const memoryResponse = await fetch(MEMORY_SERVICE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          org_id: "org_enterprise_prod", // In prod, get this from Supabase user session
+          workspace_id: chatId,
+          query: prompt,
+          top_k: 3
+        }),
+      });
+      if (memoryResponse.ok) {
+        const memoryData = await memoryResponse.json();
+        contextChunks = memoryData.chunks || [];
+      }
+    } catch (e) {
+      console.error('Memory retrieval failed:', e);
+    }
+
+    // 2. Orchestrate Chat with Context
     const response = await fetch(AGENT_ENGINE_URL, {
       method: 'POST',
       headers: {
@@ -20,7 +42,8 @@ export async function POST(req: NextRequest) {
         chat_id: chatId,
         prompt: prompt,
         model: model,
-        system_prompt: systemPrompt
+        system_prompt: systemPrompt,
+        context_chunks: contextChunks
       }),
     });
 
