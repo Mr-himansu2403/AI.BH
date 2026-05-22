@@ -43,6 +43,8 @@ yarn-error.log*
 # React build
 build/
 dist/
+.next/
+out/
 
 # Environment variables
 .env
