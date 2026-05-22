@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from '@aibh/state';
 import ChatColumn from '@/components/ChatColumn';
 import ArtifactPanel from '@/components/ArtifactPanel';
@@ -8,13 +8,18 @@ import AgentWorkflowCanvas from '@/components/AgentWorkflowCanvas';
 import CodeKernelManager from '@/components/CodeKernelManager';
 
 interface PageProps {
-  params: { chatId: string };
-  searchParams: { view?: string };
+  params: Promise<{ chatId: string }>;
+  searchParams: Promise<{ view?: string }>;
 }
 
-export default function ChatWorkspacePage({ params, searchParams }: PageProps) {
-  const { chatId } = params;
-  const view = searchParams.view || 'chat';
+export default function ChatWorkspacePage(props: PageProps) {
+  const { 
+    chatId 
+  } = React.use(props.params);
+  
+  const { 
+    view = 'chat' 
+  } = React.use(props.searchParams);
 
   const setActiveChatId = useAppStore((state) => state.setActiveChatId);
   const activeArtifact = useAppStore((state) => state.activeArtifact);
