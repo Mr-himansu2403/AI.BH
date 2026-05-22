@@ -4,6 +4,7 @@ import { Bot, MessageSquare, Terminal, GitBranch, Settings, Compass } from 'luci
 import Link from 'next/link';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <main className="flex-1 flex min-w-0 overflow-hidden relative">
           {children}
         </main>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

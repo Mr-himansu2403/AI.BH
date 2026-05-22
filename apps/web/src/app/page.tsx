@@ -57,20 +57,17 @@ export default function HomePage() {
               <h3 className="text-xl font-bold text-white mb-3">Autonomous LangGraph Agents</h3>
               <p className="text-sand-300 text-sm leading-relaxed">
                 Deploy cyclic reasoning graphs with built-in planner loops, MCP tool execution runners, reflection critiques, and automatic self-correction retries.
-              </p>
-            </div>
-          </motion.div>
-        </div>
+              import Link from 'next/link';
+              import LoginModal from '@/components/LoginModal';
 
-        {/* CTA Section */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/chat/workspace_main" className="px-8 py-4 bg-gradient-to-r from-warm-500 to-warm-600 hover:from-warm-600 hover:to-warm-700 text-white font-bold rounded-xl shadow-2xl flex items-center space-x-3 transition-all hover:scale-105 border border-warm-400/30 w-full sm:w-auto justify-center">
-            <Bot className="w-5 h-5" />
-            <span>Launch Enterprise Workspace</span>
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
+              export default function HomePage() {
+                return (
+              ...
+                      {/* CTA Section */}
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <LoginModal />
+                      </motion.div>
+                    </div>
+                  </div>
+                );
+              }
