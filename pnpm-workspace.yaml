@@ -1,9 +1,0 @@
-packages:
-  - 'apps/*'
-  - 'services/*'
-  - 'packages/*'
-  - 'tools/*'
-  - 'gateway/*'
-  - 'realtime/*'
-  - 'worker/*'
-  - 'frontend'

@@ -13,12 +13,14 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aibh_user -d aibh_db"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
-    build: ../backend
+    build: 
+      context: ../backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -38,20 +40,51 @@ services:
       retries: 3
     restart: unless-stopped
 
-  frontend:
-    build: ../frontend
+  agent-engine:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.agent-engine
     ports:
-      - "3000:3000"
+      - "8001:8001"
     environment:
-      VITE_API_BASE_URL: http://localhost:8080/api
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+    restart: unless-stopped
+
+  memory-service:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.memory-service
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+
+  web-app:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile.web
+    ports:
+      - "3001:3001"
+    environment:
+      - AGENT_ENGINE_URL=http://agent-engine:8001/api/orchestrator/chat
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+    depends_on:
+      - agent-engine
+      - backend
+    restart: unless-stopped
+
+  legacy-frontend:
+    build: 
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080/api
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     restart: unless-stopped
 
 volumes:
