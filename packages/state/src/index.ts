@@ -24,6 +24,21 @@ export interface Chat {
   lastMessageAt: number;
 }
 
+export interface Artifact {
+  id: string;
+  title: string;
+  language: string;
+  content: string;
+  version: number;
+}
+
+export interface AgentStep {
+  id: string;
+  action: string;
+  status: 'pending' | 'running' | 'success' | 'failed';
+  result?: string;
+}
+
 // --- Slice Interfaces ---
 export interface ChatSlice {
   chats: Record<string, Chat>;
@@ -37,6 +52,24 @@ export interface ChatSlice {
   commitStreamedMessage: (role?: 'assistant' | 'tool') => string | undefined;
   addMessage: (chatId: string, message: Message) => void;
 }
+
+export interface ArtifactSlice {
+  activeArtifact: Artifact | null;
+  artifactHistory: Artifact[];
+  viewMode: 'preview' | 'code' | 'split';
+  setActiveArtifact: (artifact: Artifact) => void;
+  setViewMode: (mode: 'preview' | 'code' | 'split') => void;
+}
+
+export interface AgentSlice {
+  executionGraph: AgentStep[];
+  activeStepId: string | null;
+  setExecutionGraph: (steps: AgentStep[]) => void;
+  updateStepStatus: (stepId: string, status: 'pending' | 'running' | 'success' | 'failed', result?: string) => void;
+}
+
+// --- Combined Store Type ---
+export type AppStore = ChatSlice & ArtifactSlice & AgentSlice;
 
 // --- Slice Implementations ---
 const createChatSlice: StateCreator<AppStore, [['zustand/devtools', never]], [], ChatSlice> = (set, get) => ({

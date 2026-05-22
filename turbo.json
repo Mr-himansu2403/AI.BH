@@ -1,5 +1,24 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "POSTGRES_DATABASE",
+    "SUPABASE_URL",
+    "SUPABASE_JWT_SECRET",
+    "POSTGRES_USER",
+    "POSTGRES_PRISMA_URL",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_ANON_KEY",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_URL_NON_POOLING",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "POSTGRES_HOST",
+    "SUPABASE_SECRET_KEY",
+    "POSTGRES_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "AGENT_ENGINE_URL",
+    "NEXT_PUBLIC_API_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
