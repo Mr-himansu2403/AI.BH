@@ -7,4 +7,3 @@ packages:
   - 'realtime/*'
   - 'worker/*'
   - 'frontend'
-  - 'backend'

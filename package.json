@@ -11,8 +11,7 @@
     "gateway/*",
     "realtime/*",
     "worker/*",
-    "frontend",
-    "backend"
+    "frontend"
   ],
   "scripts": {
     "build": "turbo run build",
