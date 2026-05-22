@@ -110,20 +110,28 @@ export default function DiscoveryDashboard() {
               <div className="flex items-center justify-between mb-4 px-2">
                 <h3 className="text-sm font-bold text-white flex items-center space-x-2">
                   <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  <span>Enterprise Knowledge Graphs</span>
+                  <span>Agent Templates</span>
                 </h3>
               </div>
-              <div className="flex-1 p-6 bg-gradient-to-br from-navy-800 to-navy-900 border border-navy-700 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl group-hover:bg-emerald-500/20 transition-all" />
-                <div className="relative">
-                  <p className="text-xs text-sand-300 leading-relaxed mb-6">
-                    Our RAG engine has identified new patterns in your recent LangGraph agent logs. 
-                    <span className="text-emerald-400"> 12 optimized paths</span> detected for competitive analysis tasks.
-                  </p>
-                  <Button className="w-full bg-navy-700 hover:bg-navy-600 border border-navy-600 text-xs text-white rounded-xl h-10">
-                    Sync to Knowledge Base
-                  </Button>
-                </div>
+              <div className="grid grid-cols-1 gap-4">
+                {[
+                  { name: 'Senior Code Architect', desc: 'Analyzes repos and generates ADRs.', icon: Code, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+                  { name: 'Market Researcher', desc: 'Scrapes web and compiles competitive Intel.', icon: Globe, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+                  { name: 'Security Auditor', desc: 'Scans code for vulnerabilities and CVEs.', icon: Shield, color: 'text-warm-400', bg: 'bg-warm-500/10 border-warm-500/20' }
+                ].map((agent) => (
+                  <div key={agent.name} className={`p-4 border rounded-xl flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform ${agent.bg}`}>
+                    <div className="flex items-center space-x-4">
+                      <div className={`w-10 h-10 rounded-lg bg-navy-900 flex items-center justify-center ${agent.color}`}>
+                        <agent.icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-sand-100">{agent.name}</h4>
+                        <p className="text-xs text-sand-400">{agent.desc}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" className="text-white hover:bg-navy-900">Deploy</Button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

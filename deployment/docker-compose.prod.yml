@@ -1,0 +1,50 @@
+version: '3.8'
+
+# Production Docker Compose
+# Optimized for remote deployment (Railway, Render, AWS, etc.)
+# Assumes pre-built images and external managed databases (like Supabase)
+
+services:
+  backend:
+    image: ${REGISTRY_URL}/aibh-backend:latest
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # Point this to Supabase Transaction pooler in prod
+      SPRING_DATASOURCE_URL: ${DATABASE_URL}
+      SPRING_DATASOURCE_USERNAME: ${DATABASE_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DATABASE_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/aibh/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  agent-engine:
+    image: ${REGISTRY_URL}/aibh-agent-engine:latest
+    ports:
+      - "8001:8001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    restart: always
+
+  web-app:
+    image: ${REGISTRY_URL}/aibh-web-app:latest
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - AGENT_ENGINE_URL=http://agent-engine:8001/api/orchestrator/chat
+      - NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+    depends_on:
+      - agent-engine
+    restart: always
