@@ -7,6 +7,7 @@ import ArtifactPanel from '@/components/ArtifactPanel';
 import AgentWorkflowCanvas from '@/components/AgentWorkflowCanvas';
 import CodeKernelManager from '@/components/CodeKernelManager';
 import DiscoveryDashboard from '@/components/DiscoveryDashboard';
+import ChatSidebar from '@/components/ChatSidebar';
 
 interface PageProps {
   params: Promise<{ chatId: string }>;
@@ -31,6 +32,7 @@ export default function ChatWorkspacePage(props: PageProps) {
 
   return (
     <div className="flex-1 flex h-full overflow-hidden relative bg-navy-900">
+      <ChatSidebar />
       {/* Primary Chat Column */}
       <div className={`flex flex-col h-full transition-all duration-300 ${activeArtifact && view === 'chat' ? 'w-1/2 border-r border-navy-700' : 'flex-1'}`}>
         <ChatColumn chatId={chatId} currentView={view} />

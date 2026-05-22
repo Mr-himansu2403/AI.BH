@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, Message } from '@aibh/state';
-import { Bot, User, Send, Cpu, Sparkles, AlertCircle, RefreshCw, Edit3, Check, Layers } from 'lucide-react';
+import { Bot, User, Send, Cpu, Sparkles, AlertCircle, RefreshCw, Edit3, Check, Layers, Paperclip, Image as ImageIcon, Folder, X, MoreVertical, Hash } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -17,39 +17,63 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
   const [selectedModel, setSelectedModel] = useState('claude-3-5-sonnet');
   const [systemPrompt, setSystemPrompt] = useState('You are AI.bh, an elite enterprise AI operating system. Provide clear, modular, and production-ready code or analysis.');
   const [isEditingSystem, setIsEditingSystem] = useState(false);
+  const [attachments, setAttachments] = useState<{ name: string, type: string, file?: File }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [, startTransition] = useTransition();
 
   const messages = useAppStore((state) => state.messages[chatId] || []);
+  const chats = useAppStore((state) => state.chats);
+  const currentChat = chats[chatId] || { topic: 'General' };
+
   const isStreaming = useAppStore((state) => state.isStreaming);
   const streamingContent = useAppStore((state) => state.streamingContent);
   const addMessage = useAppStore((state) => state.addMessage);
+  const setChatTopic = useAppStore((state) => state.setChatTopic);
   const appendStreamChunk = useAppStore((state) => state.appendStreamChunk);
   const commitStreamedMessage = useAppStore((state) => state.commitStreamedMessage);
   const setActiveArtifact = useAppStore((state) => state.setActiveArtifact);
   const setExecutionGraph = useAppStore((state) => state.setExecutionGraph);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages, streamingContent]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files) {
+    const newFiles = Array.from(e.target.files).map(file => ({
+      name: file.name,
+      type: file.type,
+      file
+    }));
+    setAttachments(prev => [...prev, ...newFiles]);
+  }
+};
 
-  // Handle sending messages to the actual API
-  const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+const removeAttachment = (index: number) => {
+  setAttachments(prev => prev.filter((_, i) => i !== index));
+};
 
-    const userMsg: Message = {
-      id: `msg_${Date.now()}`,
-      role: 'user',
-      content: input,
-      timestamp: Date.now(),
-    };
+// Handle sending messages to the actual API
+const handleSend = async () => {
+  if ((!input.trim() && attachments.length === 0) || isStreaming) return;
 
-    addMessage(chatId, userMsg);
-    setInput('');
+  const userMsg: Message = {
+    id: `msg_${Date.now()}`,
+    role: 'user',
+    content: input + (attachments.length > 0 ? `\n\n[Attached: ${attachments.map(a => a.name).join(', ')}]` : ''),
+    timestamp: Date.now(),
+    attachments: attachments.map(a => ({ id: Math.random().toString(), name: a.name, type: a.type, url: '#' }))
+  };
 
-    // Start streaming from the API
-    try {
+  addMessage(chatId, userMsg);
+  setInput('');
+  setAttachments([]);
+
+  // Start streaming from the API
+  try {
+...
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
@@ -132,19 +156,36 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
           </div>
         </div>
 
-        {/* Model Selector Dropdown */}
-        <div className="flex items-center space-x-2">
-          <label className="text-xs text-sand-400 font-semibold">Active Model:</label>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="bg-navy-900 border border-navy-700 text-sand-100 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-warm-500 shadow-inner font-semibold"
-          >
-            <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Coding/Artifacts)</option>
-            <option value="gpt-4o">GPT-4o (Reasoning/Math)</option>
-            <option value="gemini-1.5-pro">Gemini 1.5 Pro (1M Context/RAG)</option>
-            <option value="vllm-llama-3-70b">vLLM Llama-3 70B (Local Air-Gapped)</option>
-          </select>
+        {/* Topic & Model Selector */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Hash className="w-3.5 h-3.5 text-warm-400" />
+            <select
+              value={currentChat.topic}
+              onChange={(e) => setChatTopic(chatId, e.target.value)}
+              className="bg-navy-900 border border-navy-700 text-sand-100 text-[10px] rounded-lg px-2 py-1 focus:outline-none font-bold uppercase tracking-wider"
+            >
+              <option value="General">General</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Research">Research</option>
+              <option value="Creative">Creative</option>
+              <option value="Security">Security</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <label className="text-xs text-sand-400 font-semibold">Active Model:</label>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="bg-navy-900 border border-navy-700 text-sand-100 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-warm-500 shadow-inner font-semibold"
+            >
+              <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Coding/Artifacts)</option>
+              <option value="gpt-4o">GPT-4o (Reasoning/Math)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (1M Context/RAG)</option>
+              <option value="vllm-llama-3-70b">vLLM Llama-3 70B (Local Air-Gapped)</option>
+            </select>
+          </div>
         </div>
       </header>
 
@@ -215,6 +256,17 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
                     <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-invert max-w-none prose-pre:bg-navy-900 prose-pre:border prose-pre:border-navy-700 prose-pre:rounded-xl">
                       {msg.content}
                     </ReactMarkdown>
+                    
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {msg.attachments.map((at) => (
+                          <div key={at.id} className="flex items-center space-x-2 bg-navy-900/50 p-2 rounded-lg border border-white/10">
+                            <Paperclip className="w-3 h-3" />
+                            <span className="text-[10px] truncate max-w-[100px]">{at.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <span className="text-[10px] text-sand-500 mt-1.5 px-1 font-mono">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -246,7 +298,46 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
 
       {/* Bottom Input Area */}
       <div className="p-6 bg-navy-800/80 backdrop-blur-md border-t border-navy-700 flex-shrink-0 shadow-2xl">
+        {/* Attachment Preview */}
+        <AnimatePresence>
+          {attachments.length > 0 && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="flex flex-wrap gap-2 mb-3 max-w-4xl mx-auto">
+              {attachments.map((file, idx) => (
+                <div key={idx} className="bg-navy-900 border border-navy-700 px-3 py-1.5 rounded-xl flex items-center space-x-2 group">
+                  <div className="w-6 h-6 bg-navy-800 rounded flex items-center justify-center">
+                    {file.type.includes('image') ? <ImageIcon className="w-3 h-3 text-emerald-400" /> : <Paperclip className="w-3 h-3 text-blue-400" />}
+                  </div>
+                  <span className="text-[10px] text-sand-100 font-mono truncate max-w-[100px]">{file.name}</span>
+                  <button onClick={() => removeAttachment(idx)} className="text-sand-600 hover:text-warm-500 transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="max-w-4xl mx-auto flex items-end space-x-3 bg-navy-900 border border-navy-700 rounded-2xl p-2 shadow-inner focus-within:border-warm-500 transition-colors">
+          <div className="flex flex-col space-y-1 pb-1">
+            <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileChange} />
+            <input type="file" ref={folderInputRef} className="hidden" {...({ webkitdirectory: "" } as any)} onChange={handleFileChange} />
+            
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-sand-500 hover:text-white hover:bg-navy-800 rounded-lg transition-all" 
+              title="Upload Files"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => folderInputRef.current?.click()}
+              className="p-2 text-sand-500 hover:text-white hover:bg-navy-800 rounded-lg transition-all" 
+              title="Upload Folder"
+            >
+              <Folder className="w-4 h-4" />
+            </button>
+          </div>
+
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -263,7 +354,7 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
+            disabled={(!input.trim() && attachments.length === 0) || isStreaming}
             className="p-3 bg-gradient-to-r from-warm-500 to-warm-600 hover:from-warm-600 hover:to-warm-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg flex items-center justify-center flex-shrink-0 hover:scale-105 active:scale-95"
           >
             {isStreaming ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

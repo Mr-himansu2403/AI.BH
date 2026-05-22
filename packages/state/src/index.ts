@@ -2,65 +2,60 @@ import { create, StateCreator } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
 // --- Domain Models ---
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: number;
+  attachments?: Attachment[];
 }
 
-export interface Artifact {
+export interface Chat {
   id: string;
   title: string;
-  language: string;
-  content: string;
-  version: number;
-}
-
-export interface AgentStep {
-  id: string;
-  action: string;
-  status: 'pending' | 'running' | 'success' | 'failed';
-  result?: string;
+  topic: string;
+  lastMessageAt: number;
 }
 
 // --- Slice Interfaces ---
 export interface ChatSlice {
+  chats: Record<string, Chat>;
   messages: Record<string, Message[]>;
   activeChatId: string | null;
   isStreaming: boolean;
   streamingContent: string;
   setActiveChatId: (chatId: string) => void;
+  setChatTopic: (chatId: string, topic: string) => void;
   appendStreamChunk: (chunk: string) => void;
-  commitStreamedMessage: (role?: 'assistant' | 'tool') => void;
+  commitStreamedMessage: (role?: 'assistant' | 'tool') => string | undefined;
   addMessage: (chatId: string, message: Message) => void;
 }
 
-export interface ArtifactSlice {
-  activeArtifact: Artifact | null;
-  artifactHistory: Artifact[];
-  viewMode: 'preview' | 'code' | 'split';
-  setActiveArtifact: (artifact: Artifact) => void;
-  setViewMode: (mode: 'preview' | 'code' | 'split') => void;
-}
-
-export interface AgentSlice {
-  executionGraph: AgentStep[];
-  activeStepId: string | null;
-  setExecutionGraph: (steps: AgentStep[]) => void;
-  updateStepStatus: (stepId: string, status: 'pending' | 'running' | 'success' | 'failed', result?: string) => void;
-}
-
-// --- Combined Store Type ---
-export type AppStore = ChatSlice & ArtifactSlice & AgentSlice;
-
 // --- Slice Implementations ---
 const createChatSlice: StateCreator<AppStore, [['zustand/devtools', never]], [], ChatSlice> = (set, get) => ({
+  chats: {},
   messages: {},
   activeChatId: null,
   isStreaming: false,
   streamingContent: '',
   setActiveChatId: (chatId) => set({ activeChatId: chatId }, false, 'chat/setActiveChatId'),
+  setChatTopic: (chatId, topic) => 
+    set((state) => ({
+      chats: {
+        ...state.chats,
+        [chatId]: { 
+          ...(state.chats[chatId] || { id: chatId, title: 'New Chat', lastMessageAt: Date.now() }), 
+          topic 
+        }
+      }
+    }), false, 'chat/setChatTopic'),
   appendStreamChunk: (chunk) =>
     set(
       (state) => ({
@@ -91,6 +86,7 @@ const createChatSlice: StateCreator<AppStore, [['zustand/devtools', never]], [],
       false,
       'chat/commitStreamedMessage'
     );
+    return newMessage.content;
   },
   addMessage: (chatId, message) =>
     set(
@@ -99,6 +95,13 @@ const createChatSlice: StateCreator<AppStore, [['zustand/devtools', never]], [],
           ...state.messages,
           [chatId]: [...(state.messages[chatId] || []), message],
         },
+        chats: {
+          ...state.chats,
+          [chatId]: {
+            ...(state.chats[chatId] || { id: chatId, title: message.content.slice(0, 30), topic: 'General' }),
+            lastMessageAt: Date.now()
+          }
+        }
       }),
       false,
       'chat/addMessage'
