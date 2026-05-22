@@ -45,6 +45,7 @@ build/
 dist/
 .next/
 out/
+.turbo/
 
 # Environment variables
 .env

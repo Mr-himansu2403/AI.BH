@@ -34,7 +34,7 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
-  // Simulated SSE token streaming for demonstration of high-performance rendering
+  // Handle sending messages to the actual API
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
 
@@ -48,6 +48,60 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
     addMessage(chatId, userMsg);
     setInput('');
 
+    // Start streaming from the API
+    try {
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatId,
+          prompt: input,
+          model: selectedModel,
+          systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to connect to AI gateway');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Response body is null');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        appendStreamChunk(chunk);
+      }
+
+      const finalContent = commitStreamedMessage('assistant');
+
+      // Automatically trigger artifact detection if code block exists
+      if (finalContent && finalContent.includes('```tsx')) {
+        const codeMatch = finalContent.match(/```tsx[\s\S]*?export default function (\w+)[\s\S]*?```/);
+        const rawCode = finalContent.replace(/[\s\S]*```tsx\n\/\/ language-tsx\n([\s\S]*?)```[\s\S]*/, '$1');
+        setActiveArtifact({
+          id: `art_${Date.now()}`,
+          title: codeMatch ? codeMatch[1] : 'ReactDashboard',
+          language: 'tsx',
+          content: rawCode,
+          version: 1,
+        });
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      appendStreamChunk("\n\n**Error**: Failed to connect to the AI orchestrator. Please ensure the backend services are running.");
+      commitStreamedMessage('assistant');
+    }
+
     // Trigger LangGraph Agent Workflow simulation if view is agents or specific intent detected
     if (currentView === 'agents' || input.toLowerCase().includes('research') || input.toLowerCase().includes('agent')) {
       startTransition(() => {
@@ -59,40 +113,6 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
         ]);
       });
     }
-
-    // Simulate token streaming response
-    let sampleResponse = '';
-    if (input.toLowerCase().includes('react') || input.toLowerCase().includes('dashboard') || input.toLowerCase().includes('html')) {
-      sampleResponse = `Here is the interactive React component dashboard you requested. I have created a fully functional analytics tracker with rich metrics and responsive layout.\n\n\`\`\`tsx\n// language-tsx\nimport React, { useState } from 'react';\n\nexport default function AnalyticsDashboard() {\n  const [count, setCount] = useState(10420);\n  return (\n    <div className="p-8 bg-slate-900 text-white rounded-2xl shadow-2xl font-sans">\n      <h1 className="text-3xl font-extrabold mb-2">Enterprise Analytics Portal</h1>\n      <p className="text-slate-400 mb-6">Real-time metrics from AI.bh streaming gateway</p>\n      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">\n        <div className="p-6 bg-slate-800 border border-slate-700 rounded-xl shadow-lg">\n          <h3 className="text-sm font-semibold text-slate-400 mb-1">Active Firecracker microVMs</h3>\n          <div className="text-4xl font-black text-emerald-400">42 Kernels</div>\n        </div>\n        <div className="p-6 bg-slate-800 border border-slate-700 rounded-xl shadow-lg">\n          <h3 className="text-sm font-semibold text-slate-400 mb-1">Tokens Processed</h3>\n          <div className="text-4xl font-black text-warm-400">{count}</div>\n        </div>\n      </div>\n      <button onClick={() => setCount(c => c + 150)} className="px-6 py-3 bg-warm-500 hover:bg-warm-600 text-white font-bold rounded-xl transition-all shadow-lg">\n        Simulate Token Ingest (+150)\n      </button>\n    </div>\n  );\n}\n\`\`\`\n\nYou can interact with this live preview in the Artifact Panel on the right!`;
-    } else {
-      sampleResponse = `I have processed your request using **${selectedModel}**. Our multi-model routing engine evaluated your prompt complexity and allocated it to the optimal inference tier.\n\n### Architectural Synthesis\n- **Context Truncation**: Preserved system directives and compressed middle episodic memory.\n- **Tool Grounding**: Verified zero external MCP dependencies required for this query.\n- **TTFT Benchmark**: Achieved Time-To-First-Token of 142ms via vLLM speculative decoding.\n\nLet me know if you would like me to generate a live code artifact or spawn an autonomous LangGraph agent loop!`;
-    }
-
-    const words = sampleResponse.split(' ');
-    let i = 0;
-
-    const interval = setInterval(() => {
-      if (i < words.length) {
-        appendStreamChunk((i > 0 ? ' ' : '') + words[i]);
-        i++;
-      } else {
-        clearInterval(interval);
-        commitStreamedMessage('assistant');
-
-        // Automatically trigger artifact detection if code block exists
-        if (sampleResponse.includes('```tsx')) {
-          const codeMatch = sampleResponse.match(/```tsx[\s\S]*?export default function (\w+)[\s\S]*?```/);
-          const rawCode = sampleResponse.replace(/[\s\S]*```tsx\n\/\/ language-tsx\n([\s\S]*?)```[\s\S]*/, '$1');
-          setActiveArtifact({
-            id: `art_${Date.now()}`,
-            title: codeMatch ? codeMatch[1] : 'ReactDashboard',
-            language: 'tsx',
-            content: rawCode,
-            version: 1,
-          });
-        }
-      }
-    }, 25);
   };
 
   return (
