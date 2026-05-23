@@ -24,7 +24,7 @@ export default function ChatColumn({ chatId, currentView }: ChatColumnProps) {
 
   const messages = useAppStore((state) => state.messages[chatId] || []);
   const chats = useAppStore((state) => state.chats);
-  const currentChat = chats[chatId] || { topic: 'General' };
+  const currentChat = (chatId && chats[chatId]) || { topic: 'General' };
 
   const isStreaming = useAppStore((state) => state.isStreaming);
   const streamingContent = useAppStore((state) => state.streamingContent);

@@ -88,7 +88,7 @@ export default function LoginModal() {
 
   return (
     <Dialog>
-      <DialogTrigger asChild>
+      <DialogTrigger>
         <Button className="px-8 py-4 bg-gradient-to-r from-warm-500 to-warm-600 hover:from-warm-600 hover:to-warm-700 text-white font-bold rounded-xl shadow-2xl flex items-center space-x-3 transition-all hover:scale-105 border border-warm-400/30 w-full sm:w-auto justify-center">
           <Bot className="w-5 h-5" />
           <span>Launch Enterprise Workspace</span>
