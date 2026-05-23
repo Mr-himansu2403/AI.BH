@@ -73,8 +73,7 @@ const handleSend = async () => {
 
   // Start streaming from the API
   try {
-...
-      const response = await fetch('/api/chat/stream', {
+    const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
