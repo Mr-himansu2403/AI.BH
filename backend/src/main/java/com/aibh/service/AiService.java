@@ -464,7 +464,64 @@ public class AiService {
     // ─── Vision ──────────────────────────────────────────────────────────────────
 
     public String generateImageResponse(String message, String imageUrl, List<ChatMessage> history) {
-        return "Vision support (image analysis) is coming soon. Please describe the image in text for now.";
+        if (!StringUtils.hasText(imageUrl)) {
+            return generateResponse(message, history);
+        }
+
+        // Currently, only Gemini supports vision via direct REST in this implementation
+        if (getOrderedProviders().contains("gemini") && StringUtils.hasText(geminiApiKey) && !geminiApiKey.startsWith("your-")) {
+            try {
+                return generateImageWithGemini(message, imageUrl);
+            } catch (Exception e) {
+                logger.warn("⚠️ [AiService] Gemini Vision failed: {}. Falling back to text-only.", e.getMessage());
+            }
+        }
+
+        return "Vision support (image analysis) is coming soon for this provider. I've received your image, but I can currently only process the text: " + message;
+    }
+
+    private String generateImageWithGemini(String message, String imageUrl) {
+        // Extract base64 and mime type from data URL
+        // Example: data:image/jpeg;base64,/9j/4AAQSkZJRg...
+        String mimeType = "image/jpeg";
+        String base64Data = imageUrl;
+
+        if (imageUrl.startsWith("data:")) {
+            int commaIndex = imageUrl.indexOf(",");
+            if (commaIndex != -1) {
+                String header = imageUrl.substring(0, commaIndex);
+                base64Data = imageUrl.substring(commaIndex + 1);
+                
+                if (header.contains("image/png")) mimeType = "image/png";
+                else if (header.contains("image/webp")) mimeType = "image/webp";
+                else if (header.contains("image/gif")) mimeType = "image/gif";
+            }
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-goog-api-key", geminiApiKey);
+
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(Map.of(
+                        "parts", List.of(
+                                Map.of("text", message),
+                                Map.of("inline_data", Map.of(
+                                        "mime_type", mimeType,
+                                        "data", base64Data
+                                ))
+                        )
+                ))
+        );
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                geminiBaseUrl + "/" + geminiDefaultModel + ":generateContent",
+                HttpMethod.POST,
+                new HttpEntity<>(requestBody, headers),
+                String.class
+        );
+
+        return extractGeminiText(response.getBody());
     }
 
     // ─── Fallback Response ───────────────────────────────────────────────────────

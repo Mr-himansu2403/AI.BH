@@ -61,22 +61,27 @@ public class ChatController {
             return ResponseEntity.ok(response);
         } catch (Throwable t) {
             logger.error("Chat endpoint failed for user: {}", user.getEmail(), t);
-            return ResponseEntity.ok(new ChatResponse(
-                    aiService.generateIntelligentResponse(request.getMessage()),
-                    request.getSessionId()
-            ));
+            
+            String fallbackResponse;
+            if ("IMAGE".equals(request.getMessageType()) && request.getImageUrl() != null) {
+                fallbackResponse = aiService.generateImageResponse(request.getMessage(), request.getImageUrl(), null);
+            } else {
+                fallbackResponse = aiService.generateIntelligentResponse(request.getMessage());
+            }
+            
+            return ResponseEntity.ok(new ChatResponse(fallbackResponse, request.getSessionId()));
         }
     }
 
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Stream chat message", description = "Stream a text message from the AI assistant using SSE")
-    @PreAuthorize("hasRole('USER') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public Flux<ServerSentEvent<String>> streamChat(
             @RequestParam String message,
             @RequestParam(required = false) String sessionId,
             @AuthenticationPrincipal UserPrincipal user) {
         
-        logger.info("Streaming chat request for user: {}", user.getEmail());
+        String userEmail = user != null ? user.getEmail() : "anonymous";
+        logger.info("Streaming chat request for user: {} (Session: {})", userEmail, sessionId);
 
         try {
             return chatService.streamAndPersist(message, sessionId, user)
@@ -90,7 +95,7 @@ public class ChatController {
                                 .build());
                     });
         } catch (Throwable t) {
-            logger.error("Streaming endpoint failed for user: {}", user.getEmail(), t);
+            logger.error("Streaming endpoint failed for user: {}", userEmail, t);
             return Flux.just(ServerSentEvent.<String>builder()
                     .data(aiService.generateIntelligentResponse(message))
                     .build());

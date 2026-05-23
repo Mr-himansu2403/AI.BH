@@ -23,7 +23,7 @@ class ModelRoutingServiceTest {
 
     @Test
     void selectsOllamaModelsByIntent() {
-        assertEquals("llama3", service.selectModel(new Intent("problem_solving", 0.8, "instructional"), false, "ollama"));
+        assertEquals("codellama", service.selectModel(new Intent("problem_solving", 0.8, "instructional"), false, "ollama"));
         assertEquals("llava", service.selectModel(new Intent("general", 0.6, "conversational"), true, "ollama"));
     }
 }

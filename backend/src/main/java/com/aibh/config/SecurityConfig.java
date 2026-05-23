@@ -69,6 +69,7 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/aibh/health").permitAll()
+                .requestMatchers("/aibh/chat/stream").permitAll() // Allow stream migration
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/swagger-ui/**").permitAll()

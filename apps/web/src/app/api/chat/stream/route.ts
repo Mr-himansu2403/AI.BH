@@ -7,65 +7,53 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { chatId, prompt, model, systemPrompt } = body;
 
-    // Forward the request to the Python FastAPI Orchestrator
-    const AGENT_ENGINE_URL = process.env.AGENT_ENGINE_URL || 'http://localhost:8001/api/orchestrator/chat';
-    const MEMORY_SERVICE_URL = process.env.MEMORY_SERVICE_URL || 'http://localhost:8002/api/memory/query';
+    // Forward the request to the Java Spring Boot Backend
+    // The Java backend handles security, RAG, and multi-model routing.
+    const JAVA_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+    const STREAM_ENDPOINT = `${JAVA_BACKEND_URL}/aibh/chat/stream`;
 
-    // 1. Fetch Episodic Memories from Go Memory Service
-    let contextChunks = [];
-    try {
-      const memoryResponse = await fetch(MEMORY_SERVICE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          org_id: "org_enterprise_prod", // In prod, get this from Supabase user session
-          workspace_id: chatId,
-          query: prompt,
-          top_k: 3
-        }),
-      });
-      if (memoryResponse.ok) {
-        const memoryData = await memoryResponse.json();
-        contextChunks = memoryData.chunks || [];
-      }
-    } catch (e) {
-      console.error('Memory retrieval failed:', e);
-    }
-
-    // 2. Orchestrate Chat with Context
-    const response = await fetch(AGENT_ENGINE_URL, {
-      method: 'POST',
+    // 1. Orchestrate Chat via Java Backend (which handles its own memory/RAG)
+    const response = await fetch(`${STREAM_ENDPOINT}?message=${encodeURIComponent(prompt)}&sessionId=${chatId}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        prompt: prompt,
-        model: model,
-        system_prompt: systemPrompt,
-        context_chunks: contextChunks
-      }),
+        // In production, forward the user's JWT from the session
+        // 'Authorization': req.headers.get('Authorization') || '',
+      }
     });
 
     if (!response.ok) {
-      throw new Error(`Agent Engine responded with ${response.status}`);
+      throw new Error(`Java Backend responded with ${response.status}`);
     }
 
-    // Currently, the agent-engine returns a static JSON response.
-    // We'll wrap it in a stream for the frontend to consume.
-    const data = await response.json();
-    const resultText = data.response || "No response received from AI engine.";
-    
     const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    
     const stream = new ReadableStream({
       async start(controller) {
-        // Stream the result text in chunks to simulate a real streaming experience
-        const chunks = resultText.split(' ');
-        for (let i = 0; i < chunks.length; i++) {
-          controller.enqueue(encoder.encode((i > 0 ? ' ' : '') + chunks[i]));
-          await new Promise((r) => setTimeout(r, 20)); // Small delay for effect
+        const reader = response.body?.getReader();
+        if (!reader) {
+          controller.close();
+          return;
         }
-        controller.close();
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            // SSE parsing: extract the "data:" part from the Java stream
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                const data = line.slice(5).trim();
+                controller.enqueue(encoder.encode(data));
+              }
+            }
+          }
+        } finally {
+          controller.close();
+        }
       },
     });
 

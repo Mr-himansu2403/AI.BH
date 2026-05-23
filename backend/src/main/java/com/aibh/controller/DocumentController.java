@@ -25,7 +25,7 @@ public class DocumentController {
     private DocumentIngestionService documentIngestionService;
 
     @PostMapping("/upload")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ENTERPRISE', 'ADMIN')")
     public ResponseEntity<Map<String, String>> uploadDocument(@RequestParam("file") MultipartFile file) throws IOException {
         if (vectorStore == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
